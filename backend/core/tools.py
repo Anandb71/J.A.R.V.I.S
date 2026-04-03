@@ -15,7 +15,6 @@ SAFE_TOOL_ALLOWLIST = {
 DANGEROUS_TOOLS_REQUIRE_CONFIRMATION = {
     "run_command",
     "manage_files",
-    "control_system_power",
 }
 
 
@@ -127,7 +126,10 @@ OLLAMA_TOOL_SCHEMAS: list[dict[str, Any]] = [
                 "properties": {
                     "operation": {"type": "string"},
                     "path": {"type": "string"},
-                    "target": {"type": "string"},
+                    "target": {
+                        "type": "string",
+                        "description": "Content for write operations.",
+                    },
                 },
                 "required": ["operation", "path"],
             },

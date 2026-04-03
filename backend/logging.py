@@ -32,3 +32,13 @@ def configure_logging(dev_mode: bool = True) -> None:
         )
     except Exception:
         pass
+
+
+def get_logger(name: str):
+    """Return a structlog logger when available, else stdlib logger."""
+    try:
+        import structlog  # type: ignore
+
+        return structlog.get_logger(name)
+    except Exception:
+        return logging.getLogger(name)

@@ -50,11 +50,22 @@ class PythonBridge {
     if (!this.process) return;
 
     this.intentionalStop = true;
-    this.process.kill('SIGTERM');
+    if (process.platform === 'win32') {
+      this.process.kill('SIGINT');
+    } else {
+      this.process.kill('SIGTERM');
+    }
 
     setTimeout(() => {
       if (this.process) {
-        this.process.kill('SIGKILL');
+        if (process.platform === 'win32') {
+          spawn('taskkill', ['/PID', String(this.process.pid), '/T', '/F'], {
+            stdio: 'ignore',
+            shell: false,
+          });
+        } else {
+          this.process.kill('SIGKILL');
+        }
       }
     }, 3000);
   }

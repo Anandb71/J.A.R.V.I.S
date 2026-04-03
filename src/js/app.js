@@ -3,6 +3,7 @@ import { ThreeEngine } from './three-engine.js';
 import { ChatPanel } from './chat-panel.js';
 import { SystemGauges } from './system-gauges.js';
 import { AudioTransport } from './audio-transport.js';
+import { VoiceClient } from './voice-client.js';
 
 (() => {
   const clock = document.getElementById('clock');
@@ -25,6 +26,12 @@ import { AudioTransport } from './audio-transport.js';
     if (voiceState) voiceState.textContent = state;
     threeEngine.setState(state);
   });
+  const ws = new JarvisSocket('ws://127.0.0.1:8765/ws');
+  const voiceClient = new VoiceClient(ws, audioTransport, (state) => {
+    if (voiceState) voiceState.textContent = state;
+    threeEngine.setState(state);
+  });
+  let disposeBackendStatus = null;
 
   function setClock() {
     const now = new Date();
@@ -52,7 +59,7 @@ import { AudioTransport } from './audio-transport.js';
       backendStatus.classList.toggle('warn', !status.running);
     });
 
-    window.jarvis.onBackendStatus((status) => {
+    disposeBackendStatus = window.jarvis.onBackendStatus((status) => {
       const running = Boolean(status.running);
       backendStatus.textContent = `Backend: ${running ? 'running' : 'down'}`;
       backendStatus.classList.toggle('online', running);
@@ -60,9 +67,8 @@ import { AudioTransport } from './audio-transport.js';
     });
   }
 
-  const ws = new JarvisSocket('ws://127.0.0.1:8765/ws');
   ws.onBinary((buffer) => {
-    audioTransport.playPcm16(buffer).catch((error) => appendLog(`audio error: ${error.message}`));
+     audioTransport.handleBinaryChunk(buffer).catch((error) => appendLog(`audio error: ${error.message}`));
   });
   ws.onMessage((message) => {
     switch (message.event) {
@@ -114,6 +120,9 @@ import { AudioTransport } from './audio-transport.js';
       case 'voice:done':
         setOrbState('idle');
         break;
+      case 'voice:tts_done':
+        audioTransport.handleTtsDone();
+        break;
       case 'vision:inspection':
         chatPanel.add('system', `vision:inspection ${JSON.stringify(message.payload.status || {}, null, 2)}`);
         break;
@@ -122,6 +131,9 @@ import { AudioTransport } from './audio-transport.js';
     }
   });
   ws.connect();
+  voiceClient.start().catch((error) => {
+    appendLog(`voice init error: ${error.message}`);
+  });
 
   btnClickThrough.addEventListener('click', async () => {
     if (!window.jarvis) return;
@@ -150,4 +162,13 @@ import { AudioTransport } from './audio-transport.js';
   });
 
   threeEngine.setState('idle');
+
+  window.addEventListener('beforeunload', () => {
+    try {
+      disposeBackendStatus?.();
+    } catch {
+      // best effort cleanup
+    }
+    voiceClient.stop();
+  });
 })();

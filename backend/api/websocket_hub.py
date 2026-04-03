@@ -43,6 +43,13 @@ class WebSocketHub:
                 for ws in stale:
                     self._connections.discard(ws)
 
+    async def send_to(self, websocket: WebSocket, message: BroadcastMessage) -> None:
+        try:
+            await websocket.send_json({"event": message.event, "payload": message.payload})
+        except Exception:
+            async with self._lock:
+                self._connections.discard(websocket)
+
     @property
     def connection_count(self) -> int:
         return len(self._connections)

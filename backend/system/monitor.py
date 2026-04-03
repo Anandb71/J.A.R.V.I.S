@@ -10,6 +10,9 @@ from typing import Any
 import psutil
 
 from backend.api.websocket_hub import BroadcastMessage, WebSocketHub
+from backend.logging import get_logger
+
+log = get_logger(__name__)
 
 
 @dataclass
@@ -44,13 +47,16 @@ class SystemMonitor:
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             self._nvml_handle = handle
             self._nvml_name = pynvml.nvmlDeviceGetName(handle).decode("utf-8", errors="ignore")
+            log.info("monitor.gpu.initialized", gpu_name=self._nvml_name)
         except Exception:
             self._gpu_available = False
             self._pynvml = None
             self._nvml_handle = None
             self._nvml_name = None
+            log.info("monitor.gpu.unavailable")
 
     async def run(self) -> None:
+        log.info("monitor.started", interval=self.interval)
         while True:
             metrics = await asyncio.to_thread(self._collect_all)
             await self.hub.broadcast(BroadcastMessage(event="system:metrics", payload=metrics))

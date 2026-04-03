@@ -199,7 +199,6 @@ function resize(nextWidth, nextHeight) {
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  composer?.setSize(width, height);
 }
 
 function syncState() {
