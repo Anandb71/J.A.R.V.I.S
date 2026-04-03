@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import asyncio
+import multiprocessing
+import sys
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -14,8 +16,11 @@ from backend.config import settings
 from backend.core.brain import AIBrain
 from backend.core.memory import RAGMemory
 from backend.core.router import SemanticRouter
+from backend.gestures.hand_tracker import HandTracker
 from backend.logging import configure_logging
 from backend.system.monitor import SystemMonitor
+from backend.utils.crash_reporter import install_crash_hooks
+from backend.utils.watchdog import watchdog_loop
 from backend.voice.duplex_pipeline import DuplexVoicePipeline
 from backend.voice.audio_manager import VoiceManager
 from backend.vision.manager import VisionManager
@@ -46,9 +51,23 @@ async def heartbeat_task() -> None:
         await asyncio.sleep(1)
 
 
+async def gesture_events_task(_app: FastAPI) -> None:
+    while True:
+        tracker = getattr(_app.state, "gesture_tracker", None)
+        if tracker is None or not tracker.is_running:
+            await asyncio.sleep(0.25)
+            continue
+
+        event = await tracker.next_event(timeout=0.5)
+        if event:
+            await hub.broadcast(BroadcastMessage(event="gesture:event", payload=event))
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    configure_logging(dev_mode=True)
+    is_packaged = bool(getattr(sys, "frozen", False))
+    configure_logging(dev_mode=not is_packaged, log_to_file=is_packaged)
+    install_crash_hooks(app_version=settings.app_version)
     log.info("app.starting", app=settings.app_name, version=settings.app_version)
     embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
     semantic_router = SemanticRouter(model=embedding_model, privacy_mode=settings.privacy_mode)
@@ -57,20 +76,36 @@ async def lifespan(_app: FastAPI):
     _app.state.brain = AIBrain(settings, router=semantic_router, memory=rag_memory, vision=_app.state.vision)
     _app.state.voice = VoiceManager.from_settings(brain=_app.state.brain, hub=hub, settings=settings)
     _app.state.system_monitor = SystemMonitor(hub=hub, interval=settings.system_metrics_interval)
+    _app.state.gesture_tracker = HandTracker(camera_index=settings.gesture_camera_index)
     _app.state.hub = hub
     _app.state.duplex_pipelines = {}  # Per-client voice pipelines (created in Step 3)
     task = asyncio.create_task(heartbeat_task())
     metrics_task = asyncio.create_task(_app.state.system_monitor.run())
+    gesture_task = asyncio.create_task(gesture_events_task(_app))
+    watchdog_task = asyncio.create_task(watchdog_loop())
+
+    if settings.gesture_enabled:
+        await _app.state.gesture_tracker.start()
     try:
         yield
     finally:
         log.info("app.shutting_down")
         task.cancel()
         metrics_task.cancel()
+        gesture_task.cancel()
+        watchdog_task.cancel()
+
+        if getattr(_app.state, "gesture_tracker", None) is not None:
+            await _app.state.gesture_tracker.stop()
+
         with suppress(asyncio.CancelledError):
             await task
         with suppress(asyncio.CancelledError):
             await metrics_task
+        with suppress(asyncio.CancelledError):
+            await gesture_task
+        with suppress(asyncio.CancelledError):
+            await watchdog_task
 
 
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
@@ -173,6 +208,19 @@ async def websocket_endpoint(websocket: WebSocket):
                 normalized_region = tuple(region) if isinstance(region, list) and len(region) == 4 else None
                 capture = app.state.vision.capture_screen(region=normalized_region)
                 await hub.broadcast(BroadcastMessage(event="vision:capture", payload=capture))
+            elif event == "gesture:enable":
+                await app.state.gesture_tracker.start()
+                await hub.broadcast(BroadcastMessage(event="gesture:status", payload={"enabled": True}))
+            elif event == "gesture:disable":
+                await app.state.gesture_tracker.stop()
+                await hub.broadcast(BroadcastMessage(event="gesture:status", payload={"enabled": False}))
+            elif event == "gesture:status":
+                await hub.broadcast(
+                    BroadcastMessage(
+                        event="gesture:status",
+                        payload={"enabled": bool(app.state.gesture_tracker.is_running)},
+                    )
+                )
             else:
                 await hub.broadcast(BroadcastMessage(event="echo", payload={"received": data}))
     except WebSocketDisconnect:
@@ -184,4 +232,5 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     uvicorn.run("backend.main:app", host=settings.host, port=settings.port, reload=False)

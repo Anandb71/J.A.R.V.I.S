@@ -153,6 +153,17 @@ app.whenReady().then(() => {
   registerShortcuts();
   pythonBridge.start();
 
+  if (app.isPackaged) {
+    try {
+      const { autoUpdater } = require('electron-updater');
+      autoUpdater.autoDownload = true;
+      autoUpdater.autoInstallOnAppQuit = true;
+      autoUpdater.checkForUpdatesAndNotify();
+    } catch (error) {
+      console.error('[updater]', error?.message || error);
+    }
+  }
+
   setInterval(broadcastBackendStatus, 5000);
 });
 

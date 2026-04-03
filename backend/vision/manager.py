@@ -38,6 +38,12 @@ class VisionManager:
 
     def inspect_active_window(self, max_depth: int = 3, max_nodes: int = 64) -> VisionSnapshot:
         snapshot = self.analyzer.capture_active_window(max_depth=max_depth, max_nodes=max_nodes)
+        if self.analyzer.privacy.is_sensitive_window(snapshot.title):
+            return VisionSnapshot(
+                status=self.get_status(),
+                window={"redacted": True, "reason": "sensitive_window_title"},
+                capture={"provider": self.capture.provider, "available": self.capture.is_available()},
+            )
         return VisionSnapshot(
             status=self.get_status(),
             window=self.analyzer.summarize(snapshot),

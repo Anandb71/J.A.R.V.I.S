@@ -16,6 +16,7 @@ from backend.core.schemas import JarvisResponse
 from backend.core.tool_executor import ToolExecutor
 from backend.core.tools import get_ollama_tool_schemas
 from backend.logging import get_logger
+from backend.utils.timing import alatency
 from backend.vision.manager import VisionManager
 
 log = get_logger(__name__)
@@ -125,56 +126,57 @@ class AIBrain:
         """Streaming chat with realtime websocket events and chunk yields."""
         start = time.perf_counter()
 
-        async def emit(event: str, payload: dict[str, Any]) -> None:
-            msg = BroadcastMessage(event=event, payload=payload)
-            if websocket is not None:
-                await hub.send_to(websocket, msg)
+        async with alatency("brain.chat_stream"):
+            async def emit(event: str, payload: dict[str, Any]) -> None:
+                msg = BroadcastMessage(event=event, payload=payload)
+                if websocket is not None:
+                    await hub.send_to(websocket, msg)
+                else:
+                    await hub.broadcast(msg)
+
+            await emit("brain:routing", {"message": message})
+            log.info("brain.stream.start", voice_session=websocket is not None)
+
+            route = await self.router.route(message=message, prefer_cloud=prefer_cloud)
+            await emit(
+                "brain:routed",
+                {"tier": route.tier.value, "intent": route.intent, "confidence": round(route.confidence, 3)},
+            )
+
+            messages = await self.memory.build_context(message, self._system_prompt)
+            messages = await self._attach_vision_context(messages, message)
+            await self.memory.add_message("user", message)
+            await emit("brain:thinking", {})
+
+            full_response = ""
+            provider = "local"
+
+            if route.intent in self.TOOL_ELIGIBLE_INTENTS:
+                response = await self._chat_local_structured(messages, hub=hub, websocket=websocket)
+                full_response = response
+                await emit("brain:chunk", {"text": response, "done": False})
+                yield response
+            elif route.tier == RoutingTier.CLOUD and self.settings.openai_api_key:
+                provider = "cloud"
+                response = await self._chat_cloud(messages)
+                full_response = response
+                await emit("brain:chunk", {"text": response, "done": False})
+                yield response
             else:
-                await hub.broadcast(msg)
+                async for chunk in self._stream_local(messages):
+                    if chunk["type"] == "text":
+                        text = chunk["data"]
+                        if text:
+                            full_response += text
+                            await emit("brain:chunk", {"text": text, "done": False})
+                            yield text
+                    elif chunk["type"] == "tool_call":
+                        await emit("brain:tool_call", {"tools": chunk["data"]})
 
-        await emit("brain:routing", {"message": message})
-        log.info("brain.stream.start", voice_session=websocket is not None)
-
-        route = await self.router.route(message=message, prefer_cloud=prefer_cloud)
-        await emit(
-            "brain:routed",
-            {"tier": route.tier.value, "intent": route.intent, "confidence": round(route.confidence, 3)},
-        )
-
-        messages = await self.memory.build_context(message, self._system_prompt)
-        messages = await self._attach_vision_context(messages, message)
-        await self.memory.add_message("user", message)
-        await emit("brain:thinking", {})
-
-        full_response = ""
-        provider = "local"
-
-        if route.intent in self.TOOL_ELIGIBLE_INTENTS:
-            response = await self._chat_local_structured(messages, hub=hub, websocket=websocket)
-            full_response = response
-            await emit("brain:chunk", {"text": response, "done": False})
-            yield response
-        elif route.tier == RoutingTier.CLOUD and self.settings.openai_api_key:
-            provider = "cloud"
-            response = await self._chat_cloud(messages)
-            full_response = response
-            await emit("brain:chunk", {"text": response, "done": False})
-            yield response
-        else:
-            async for chunk in self._stream_local(messages):
-                if chunk["type"] == "text":
-                    text = chunk["data"]
-                    if text:
-                        full_response += text
-                        await emit("brain:chunk", {"text": text, "done": False})
-                        yield text
-                elif chunk["type"] == "tool_call":
-                    await emit("brain:tool_call", {"tools": chunk["data"]})
-
-        latency_ms = self._latency_ms(start)
-        await self.memory.add_message("assistant", full_response)
-        await emit("brain:done", {"full_text": full_response, "latency_ms": latency_ms, "provider": provider})
-        log.info("brain.stream.done", provider=provider, latency_ms=latency_ms)
+            latency_ms = self._latency_ms(start)
+            await self.memory.add_message("assistant", full_response)
+            await emit("brain:done", {"full_text": full_response, "latency_ms": latency_ms, "provider": provider})
+            log.info("brain.stream.done", provider=provider, latency_ms=latency_ms)
 
     async def _chat_local_text(self, messages: list[dict[str, Any]]) -> str:
         payload: dict[str, Any] = {
@@ -188,10 +190,11 @@ class AIBrain:
 
         url = f"{self.settings.local_ai_url.rstrip('/')}/api/chat"
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
+        async with alatency("brain.chat_local_text"):
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                data = response.json()
 
         return (
             data.get("message", {}).get("content")
@@ -217,10 +220,11 @@ class AIBrain:
 
         url = f"{self.settings.local_ai_url.rstrip('/')}/api/chat"
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
+        async with alatency("brain.chat_local_structured"):
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                data = response.json()
 
         raw_content = data.get("message", {}).get("content", "")
         parsed = JarvisResponse.model_validate_json(raw_content)
@@ -286,10 +290,11 @@ class AIBrain:
             "Content-Type": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
+        async with alatency("brain.chat_cloud"):
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
 
         choices = data.get("choices", [])
         if not choices:

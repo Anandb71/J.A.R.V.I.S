@@ -12,6 +12,13 @@ SENSITIVE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"bank|wallet|credit card|card number|cvv|ssn|social security", re.IGNORECASE),
 )
 
+SENSITIVE_WINDOW_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"1Password|LastPass|Bitwarden|KeePass", re.IGNORECASE),
+    re.compile(r"Private\s*(Browsing|Window)|InPrivate|Incognito", re.IGNORECASE),
+    re.compile(r"Internet\s*Banking|NetBanking|Online\s*Banking", re.IGNORECASE),
+    re.compile(r"Authenticator|2FA|TOTP", re.IGNORECASE),
+)
+
 
 @dataclass(frozen=True)
 class PrivacyFinding:
@@ -48,6 +55,11 @@ class PrivacyFilter:
 
     def redact_many(self, values: Iterable[str | None]) -> list[str]:
         return [self.redact(value) for value in values]
+
+    def is_sensitive_window(self, window_title: str | None) -> bool:
+        if not self.enabled or not window_title:
+            return False
+        return any(pattern.search(window_title) for pattern in SENSITIVE_WINDOW_PATTERNS)
 
     def mask_control_payload(self, payload: dict[str, object]) -> dict[str, object]:
         if not self.enabled:

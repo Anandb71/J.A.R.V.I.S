@@ -27,6 +27,7 @@ from faster_whisper import WhisperModel
 
 from backend.api.websocket_hub import BroadcastMessage
 from backend.logging import get_logger
+from backend.utils.timing import alatency
 
 log = get_logger(__name__)
 
@@ -200,10 +201,11 @@ class DuplexVoicePipeline:
 
         # Transcribe
         try:
-            segments, _ = self._stt_model.transcribe(
-                tmp_path, language="en", beam_size=1
-            )
-            text = " ".join(seg.text for seg in segments).strip()
+            async with alatency("voice.stt"):
+                segments, _ = self._stt_model.transcribe(
+                    tmp_path, language="en", beam_size=1
+                )
+                text = " ".join(seg.text for seg in segments).strip()
         finally:
             try:
                 os.unlink(tmp_path)
@@ -226,14 +228,15 @@ class DuplexVoicePipeline:
             communicate = Communicate(text=text, voice="en-US-AriaNeural")
             log.info("voice.tts.start", chars=len(text))
 
-            async for chunk in communicate.stream():
-                if self._interrupt.is_set():
-                    log.info("voice.tts.interrupted")
-                    return
+            async with alatency("voice.tts"):
+                async for chunk in communicate.stream():
+                    if self._interrupt.is_set():
+                        log.info("voice.tts.interrupted")
+                        return
 
-                if chunk["type"] == "audio":
-                    # Send raw MP3 bytes as binary frame
-                    await self.websocket.send_bytes(chunk["data"])
+                    if chunk["type"] == "audio":
+                        # Send raw MP3 bytes as binary frame
+                        await self.websocket.send_bytes(chunk["data"])
 
             # Signal end of TTS
             await self.hub.send_to(
