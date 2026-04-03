@@ -38,7 +38,7 @@ async def lifespan(_app: FastAPI):
     semantic_router = SemanticRouter(model=embedding_model, privacy_mode=settings.privacy_mode)
     rag_memory = RAGMemory(embedding_model=embedding_model)
     _app.state.brain = AIBrain(settings, router=semantic_router, memory=rag_memory)
-    _app.state.voice = VoiceManager(brain=_app.state.brain, hub=hub)
+    _app.state.voice = VoiceManager.from_settings(brain=_app.state.brain, hub=hub, settings=settings)
     _app.state.hub = hub
     task = asyncio.create_task(heartbeat_task())
     try:
