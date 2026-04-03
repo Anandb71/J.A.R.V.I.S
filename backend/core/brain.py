@@ -14,6 +14,7 @@ from backend.core.router import RoutingTier, SemanticRouter
 from backend.core.schemas import JarvisResponse
 from backend.core.tool_executor import ToolExecutor
 from backend.core.tools import get_ollama_tool_schemas
+from backend.vision.manager import VisionManager
 
 
 @dataclass
@@ -34,11 +35,13 @@ class AIBrain:
         router: SemanticRouter | None = None,
         memory: RAGMemory | None = None,
         tool_executor: ToolExecutor | None = None,
+        vision: VisionManager | None = None,
     ) -> None:
         self.settings = settings
         self.router = router or SemanticRouter(privacy_mode=settings.privacy_mode)
         self.memory = memory or RAGMemory(embedding_model=self.router.model, session_id=session_id)
         self.tool_executor = tool_executor or ToolExecutor()
+        self.vision = vision
         self._system_prompt = {
             "role": "system",
             "content": (
@@ -58,6 +61,7 @@ class AIBrain:
         start = time.perf_counter()
         route = await self.router.route(message=message, prefer_cloud=prefer_cloud)
         messages = await self.memory.build_context(message, self._system_prompt)
+        messages = await self._attach_vision_context(messages, message)
         await self.memory.add_message("user", message)
 
         reply_text = ""
@@ -119,6 +123,7 @@ class AIBrain:
         )
 
         messages = await self.memory.build_context(message, self._system_prompt)
+        messages = await self._attach_vision_context(messages, message)
         await self.memory.add_message("user", message)
         await hub.broadcast(BroadcastMessage(event="brain:thinking", payload={}))
 
@@ -300,6 +305,32 @@ class AIBrain:
 
                     if chunk.get("done"):
                         break
+
+    async def _attach_vision_context(self, messages: list[dict[str, Any]], message: str) -> list[dict[str, Any]]:
+        if not self.vision or not self._should_attach_vision_context(message):
+            return messages
+
+        snapshot = self.vision.inspect_active_window(max_depth=2, max_nodes=24)
+        if not snapshot.window:
+            return messages
+
+        enriched = list(messages)
+        enriched.append(
+            {
+                "role": "system",
+                "content": (
+                    "Use this structured screen context if it is relevant to the user's question:\n"
+                    f"{json.dumps(snapshot.window, indent=2, ensure_ascii=False)}"
+                ),
+            }
+        )
+        return enriched
+
+    @staticmethod
+    def _should_attach_vision_context(message: str) -> bool:
+        lowered = message.lower()
+        keywords = ("screen", "window", "app", "application", "what's on my screen", "what am i looking at", "ui")
+        return any(keyword in lowered for keyword in keywords)
 
     @staticmethod
     def _latency_ms(start: float) -> int:

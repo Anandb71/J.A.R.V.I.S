@@ -14,6 +14,7 @@ from backend.core.brain import AIBrain
 from backend.core.memory import RAGMemory
 from backend.core.router import SemanticRouter
 from backend.voice.audio_manager import VoiceManager
+from backend.vision.manager import VisionManager
 
 hub = WebSocketHub()
 
@@ -37,7 +38,8 @@ async def lifespan(_app: FastAPI):
     embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
     semantic_router = SemanticRouter(model=embedding_model, privacy_mode=settings.privacy_mode)
     rag_memory = RAGMemory(embedding_model=embedding_model)
-    _app.state.brain = AIBrain(settings, router=semantic_router, memory=rag_memory)
+    _app.state.vision = VisionManager.from_settings(settings)
+    _app.state.brain = AIBrain(settings, router=semantic_router, memory=rag_memory, vision=_app.state.vision)
     _app.state.voice = VoiceManager.from_settings(brain=_app.state.brain, hub=hub, settings=settings)
     _app.state.hub = hub
     task = asyncio.create_task(heartbeat_task())
@@ -97,6 +99,25 @@ async def websocket_endpoint(websocket: WebSocket):
                 keyword = str(payload.get("keyword", "hey jarvis"))
                 confidence = float(payload.get("confidence", 1.0))
                 await app.state.voice.simulate_wake_word(keyword=keyword, confidence=confidence)
+            elif event == "vision:inspect":
+                max_depth = int(payload.get("max_depth", 3))
+                max_nodes = int(payload.get("max_nodes", 64))
+                snapshot = app.state.vision.inspect_active_window(max_depth=max_depth, max_nodes=max_nodes)
+                await hub.broadcast(
+                    BroadcastMessage(
+                        event="vision:inspection",
+                        payload={
+                            "status": snapshot.status,
+                            "window": snapshot.window,
+                            "capture": snapshot.capture,
+                        },
+                    )
+                )
+            elif event == "vision:capture":
+                region = payload.get("region")
+                normalized_region = tuple(region) if isinstance(region, list) and len(region) == 4 else None
+                capture = app.state.vision.capture_screen(region=normalized_region)
+                await hub.broadcast(BroadcastMessage(event="vision:capture", payload=capture))
             else:
                 await hub.broadcast(BroadcastMessage(event="echo", payload={"received": data}))
     except WebSocketDisconnect:

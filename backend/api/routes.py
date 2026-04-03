@@ -164,3 +164,34 @@ async def voice_simulate(request: Request) -> dict:
     prefer_cloud = bool(payload.get("prefer_cloud", False))
     voice = request.app.state.voice
     return await voice.process_transcript(transcript, prefer_cloud=prefer_cloud)
+
+
+# Vision / Screen Grounding Endpoints
+
+@router.get("/vision/status")
+async def vision_status(request: Request) -> dict:
+    vision = request.app.state.vision
+    return vision.get_status()
+
+
+@router.post("/vision/inspect")
+async def vision_inspect(request: Request) -> dict:
+    payload = await request.json()
+    max_depth = int(payload.get("max_depth", 3))
+    max_nodes = int(payload.get("max_nodes", 64))
+    vision = request.app.state.vision
+    snapshot = vision.inspect_active_window(max_depth=max_depth, max_nodes=max_nodes)
+    return {
+        "status": snapshot.status,
+        "window": snapshot.window,
+        "capture": snapshot.capture,
+    }
+
+
+@router.post("/vision/capture")
+async def vision_capture(request: Request) -> dict:
+    payload = await request.json()
+    region = payload.get("region")
+    normalized_region = tuple(region) if isinstance(region, list) and len(region) == 4 else None
+    vision = request.app.state.vision
+    return vision.capture_screen(region=normalized_region)
