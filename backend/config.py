@@ -29,6 +29,7 @@ class Settings:
     picovoice_access_key: str = os.getenv("PICOVOICE_ACCESS_KEY", "")
     vision_provider: str = os.getenv("JARVIS_VISION_PROVIDER", "local")
     privacy_mode: bool = os.getenv("JARVIS_PRIVACY_MODE", "true").lower() == "true"
+    system_metrics_interval: float = float(os.getenv("JARVIS_SYSTEM_METRICS_INTERVAL", "1.0"))
 
 
 settings = Settings()

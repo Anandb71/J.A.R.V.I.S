@@ -1,3 +1,4 @@
+const { app } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -14,12 +15,13 @@ class PythonBridge {
     if (this.process) return;
 
     const projectRoot = path.resolve(__dirname, '..');
+    const runtimeRoot = app.isPackaged ? process.resourcesPath : projectRoot;
     const venvPython = path.join(projectRoot, '.venv', 'Scripts', 'python.exe');
     const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
 
     this.intentionalStop = false;
     this.process = spawn(pythonCmd, ['-m', 'backend.main'], {
-      cwd: projectRoot,
+      cwd: runtimeRoot,
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,
     });
