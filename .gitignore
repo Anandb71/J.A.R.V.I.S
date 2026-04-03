@@ -1,0 +1,35 @@
+# Node/Electron
+node_modules/
+npm-debug.log*
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Build artifacts
+dist/
+build/
+*.spec
+
+# Generated runtime data
+.jarvis/
+backend/memory/
+*.db
+
+# Engineering plans and blueprints
+implementation_plan.md
+plans/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db

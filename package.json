@@ -1,0 +1,17 @@
+{
+  "name": "jarvis-desktop-assistant",
+  "version": "0.1.0",
+  "description": "Project JARVIS - Electron + FastAPI desktop AI assistant",
+  "main": "electron/main.js",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "lint": "echo \"Linting not configured yet\"",
+    "typecheck": "echo \"Typecheck not configured yet\""
+  },
+  "dependencies": {
+    "electron": "^33.0.0"
+  }
+}
