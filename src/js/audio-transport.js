@@ -65,7 +65,7 @@ export class AudioTransport {
     this.mediaSource.addEventListener('sourceopen', () => {
       if (generation !== this._streamGeneration) return;
       // Create SourceBuffer for MP3 (audio/mpeg)
-      if (!this.sourceBuffer || this.sourceBuffer.ended) {
+      if (!this.sourceBuffer) {
         this.sourceBuffer = this.mediaSource.addSourceBuffer('audio/mpeg');
 
         // Drain pending queue when updateend fires

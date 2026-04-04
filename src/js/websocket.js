@@ -4,7 +4,9 @@ export class JarvisSocket {
     this.ws = null;
     this.listeners = new Set();
     this.binaryListeners = new Set();
-    this.reconnectDelay = 1200;
+    this.baseReconnectDelay = 1200;
+    this.maxReconnectDelay = 30000;
+    this.reconnectAttempts = 0;
   }
 
   connect() {
@@ -12,6 +14,7 @@ export class JarvisSocket {
     this.ws.binaryType = 'arraybuffer';
 
     this.ws.onopen = () => {
+      this.reconnectAttempts = 0;
       this.emit({ event: 'socket', payload: { state: 'connected' } });
     };
 
@@ -30,7 +33,13 @@ export class JarvisSocket {
 
     this.ws.onclose = () => {
       this.emit({ event: 'socket', payload: { state: 'closed' } });
-      setTimeout(() => this.connect(), this.reconnectDelay);
+      const delay = Math.min(
+        this.baseReconnectDelay * (2 ** this.reconnectAttempts),
+        this.maxReconnectDelay,
+      );
+      const jitteredDelay = Math.floor(delay * (0.5 + Math.random() * 0.5));
+      this.reconnectAttempts += 1;
+      setTimeout(() => this.connect(), jitteredDelay);
     };
 
     this.ws.onerror = () => {
