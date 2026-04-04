@@ -8,10 +8,14 @@ from enum import Enum
 from typing import Any, AsyncIterator
 
 from backend.api.websocket_hub import BroadcastMessage, WebSocketHub
+from backend.config import Settings
 from backend.core.brain import AIBrain
 from backend.voice.listener import EchoSpeechToTextEngine, SpeechToTextEngine, TranscriptionResult
+from backend.voice.listener import FasterWhisperEngine
 from backend.voice.speaker import SilentSpeaker, TextToSpeechEngine
+from backend.voice.speaker import EdgeTTSpeaker
 from backend.voice.wake_word import ManualWakeWordDetector, WakeWordDetector, WakeWordEvent
+from backend.voice.wake_word import PorcupineWakeWordDetector
 
 
 class VoiceState(str, Enum):
@@ -57,8 +61,50 @@ class VoiceManager:
         self._running = False
         self._lock = asyncio.Lock()
 
+    @classmethod
+    def from_settings(cls, brain: AIBrain, hub: WebSocketHub, settings: Settings) -> "VoiceManager":
+        wake_detector: WakeWordDetector
+        stt_engine: SpeechToTextEngine
+        tts_engine: TextToSpeechEngine
+
+        if settings.wake_word_provider == "porcupine" and getattr(settings, "picovoice_access_key", ""):
+            try:
+                wake_detector = PorcupineWakeWordDetector(access_key=getattr(settings, "picovoice_access_key", ""))
+            except Exception:
+                wake_detector = ManualWakeWordDetector(keyword=settings.wake_word_phrase)
+        else:
+            wake_detector = ManualWakeWordDetector(keyword=settings.wake_word_phrase)
+
+        if settings.stt_provider == "faster_whisper":
+            try:
+                stt_engine = FasterWhisperEngine()
+            except Exception:
+                stt_engine = EchoSpeechToTextEngine()
+        else:
+            stt_engine = EchoSpeechToTextEngine()
+
+        if settings.tts_provider == "edge":
+            try:
+                tts_engine = EdgeTTSpeaker()
+            except Exception:
+                tts_engine = SilentSpeaker()
+        else:
+            tts_engine = SilentSpeaker()
+
+        manager = cls(
+            brain=brain,
+            hub=hub,
+            wake_detector=wake_detector,
+            stt_engine=stt_engine,
+            tts_engine=tts_engine,
+        )
+        manager.status.enabled = settings.voice_enabled
+        return manager
+
     async def start(self) -> None:
         if self._running:
+            return
+        if not self.status.enabled:
             return
         self._running = True
         await self.wake_detector.start(self._on_wake_word)
@@ -105,14 +151,27 @@ class VoiceManager:
         )
 
         audio_chunks = []
-        async for chunk in self.tts_engine.speak(reply.text):
-            audio_chunks.append(len(chunk.data))
-            await self.hub.broadcast(
-                BroadcastMessage(
-                    event="voice:audio_chunk",
-                    payload={"provider": chunk.provider, "bytes": len(chunk.data)},
+        speaker = self.tts_engine
+        try:
+            async for chunk in speaker.speak(reply.text):
+                audio_chunks.append(len(chunk.data))
+                await self.hub.broadcast(
+                    BroadcastMessage(
+                        event="voice:audio_chunk",
+                        payload={"provider": chunk.provider, "bytes": len(chunk.data)},
+                    )
                 )
-            )
+        except Exception as exc:
+            self.status.last_error = str(exc)
+            speaker = SilentSpeaker()
+            async for chunk in speaker.speak(reply.text):
+                audio_chunks.append(len(chunk.data))
+                await self.hub.broadcast(
+                    BroadcastMessage(
+                        event="voice:audio_chunk",
+                        payload={"provider": chunk.provider, "bytes": len(chunk.data), "fallback": True},
+                    )
+                )
 
         await self.set_state(VoiceState.IDLE)
         await self.hub.broadcast(

@@ -26,6 +26,7 @@ class Settings:
     wake_word_provider: str = os.getenv("JARVIS_WAKE_WORD_PROVIDER", "manual")
     wake_word_phrase: str = os.getenv("JARVIS_WAKE_WORD_PHRASE", "hey jarvis")
     voice_enabled: bool = os.getenv("JARVIS_VOICE_ENABLED", "true").lower() == "true"
+    picovoice_access_key: str = os.getenv("PICOVOICE_ACCESS_KEY", "")
     vision_provider: str = os.getenv("JARVIS_VISION_PROVIDER", "local")
     privacy_mode: bool = os.getenv("JARVIS_PRIVACY_MODE", "true").lower() == "true"
 

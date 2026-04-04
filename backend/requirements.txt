@@ -6,3 +6,7 @@ httpx>=0.27.0
 sentence-transformers>=3.0.0
 numpy>=2.0.0
 chromadb>=0.5.0
+edge-tts>=6.1.0
+faster-whisper>=1.1.0
+pvporcupine>=3.0.0
+pvrecorder>=1.2.0
