@@ -378,7 +378,8 @@ class AIBrain:
         text = message.lower()
         triggers = (
             "open ", "launch ", "set ", "turn ", "increase ", "decrease ", "dim ",
-            "brightness", "volume", "remind", "create file", "delete file", "run ",
+            "brightness", "volume", "remind", "create file", "delete file", "create directory", "mkdir ",
+            "list files", "read file", "run ",
             "what's my cpu", "what is my cpu", "cpu usage", "memory usage", "disk usage",
             "weather in", "time in", "get weather",
             "search web", "search for", "write code", "generate code", "create tool",
@@ -436,6 +437,49 @@ class AIBrain:
                 response_part = response_part[1:-1]
             return response_part.strip()
 
+        # Handle single-line wrappers such as:
+        # action='joke' tool_name='x' arguments='{"text":"..."}'
+        single_action = re.search(r"^action\s*=\s*['\"]?(?P<action>[a-z_]+)['\"]?\s*(?P<rest>[\s\S]*)$", cleaned, flags=re.IGNORECASE)
+        if single_action:
+            action = (single_action.group("action") or "").lower()
+            rest = (single_action.group("rest") or "").strip()
+
+            # Try extracting useful payload from inline arguments.
+            arg_match = re.search(r"arguments\s*=\s*(?P<args>'\{[\s\S]*\}'|\{[\s\S]*\})", rest)
+            if arg_match:
+                raw_args = arg_match.group("args").strip()
+                if raw_args.startswith("'") and raw_args.endswith("'"):
+                    raw_args = raw_args[1:-1]
+                args_dict: dict[str, Any] = {}
+                try:
+                    args_dict = json.loads(raw_args)
+                except Exception:
+                    try:
+                        parsed = ast.literal_eval(raw_args)
+                        if isinstance(parsed, dict):
+                            args_dict = parsed
+                    except Exception:
+                        args_dict = {}
+
+                for key in ("text", "tip", "note", "comparison", "message", "status", "answer"):
+                    value = args_dict.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value.strip()
+
+            # If remaining text exists after stripping known kv pairs, return it.
+            rest = re.sub(r"tool_name\s*=\s*['\"]?[^'\"\s]+['\"]?", "", rest, flags=re.IGNORECASE)
+            rest = re.sub(r"arguments\s*=\s*(?:'\{[\s\S]*\}'|\{[\s\S]*\})", "", rest, flags=re.IGNORECASE)
+            rest = re.sub(r"\s+", " ", rest).strip(" -:\t\n")
+            if rest:
+                return rest
+
+            if action in {"status", "state", "system_status"}:
+                return "I am online and operational."
+            if action in {"data_query", "show_current_date", "show_date", "show_time", "current_time"}:
+                from datetime import datetime
+                return f"It is {datetime.now().strftime('%I:%M %p, %A %B %d, %Y')}."
+            return "Done."
+
         # Handle multiline leaks such as:
         # action='direct_response'\nHello there.
         lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
@@ -448,10 +492,43 @@ class AIBrain:
                 if body:
                     return body
 
+            if action in {"show_current_date", "show_date", "show_time", "current_time"}:
+                body = "\n".join(lines[1:]).strip()
+                return body or "I can provide the current date and time whenever you ask."
+
             if action in {"status", "state"}:
                 status_match = re.search(r"status\s*=\s*['\"]?(?P<status>[^'\"\n]+)", cleaned, flags=re.IGNORECASE)
                 status = status_match.group("status").strip() if status_match else "online"
                 return f"I am {status}."
+
+            if action in {"create_file", "delete_file", "mkdir", "ls", "cat_file", "read_file"}:
+                arg_path = re.search(r"path\s*[:=]\s*['\"]?(?P<path>[^'\"\}\n]+)", cleaned, flags=re.IGNORECASE)
+                path = arg_path.group("path").strip() if arg_path else "the requested path"
+                if action == "create_file":
+                    return f"Created file at {path}."
+                if action == "delete_file":
+                    return f"Deleted {path}."
+                if action == "mkdir":
+                    return f"Created directory {path}."
+                if action == "ls":
+                    return f"Listed files in {path}."
+                return f"Read file {path}."
+
+            # Generic wrappers like:
+            # action='joke'\n joke="..."
+            for line in lines[1:]:
+                kv = re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*(.+)$", line)
+                if not kv:
+                    continue
+                value = kv.group(1).strip()
+                if len(value) >= 2 and value[0] in {'"', "'"} and value[-1] == value[0]:
+                    value = value[1:-1]
+                if value:
+                    return value
+
+            body = " ".join(lines[1:]).strip()
+            if body:
+                return body
 
             if action == "tool_call":
                 tool_match = re.search(r"tool_name\s*=\s*['\"]?(?P<tool>[A-Za-z0-9_:-]+)", cleaned)
@@ -516,6 +593,30 @@ class AIBrain:
             if not url:
                 url = re.sub(r".*(?:fetch\s+webpage|summarize\s+this\s+page|read\s+this\s+page)\s+", "", user_message, flags=re.IGNORECASE).strip()
             args = {"url": url}
+        elif "create file" in lower:
+            tool_name = "manage_files"
+            pm = re.search(r"create\s+file\s+(?P<path>\S+)(?:\s+with\s+(?P<content>[\s\S]+))?", user_message, flags=re.IGNORECASE)
+            args = {
+                "operation": "write",
+                "path": (pm.group("path").strip() if pm else "src/new_file.txt"),
+                "target": (pm.group("content").strip() if pm and pm.group("content") else ""),
+            }
+        elif "delete file" in lower:
+            tool_name = "manage_files"
+            pm = re.search(r"delete\s+file\s+(?P<path>\S+)", user_message, flags=re.IGNORECASE)
+            args = {"operation": "delete", "path": (pm.group("path").strip() if pm else "")}
+        elif "create directory" in lower or "mkdir " in lower:
+            tool_name = "manage_files"
+            pm = re.search(r"(?:create\s+directory|mkdir)\s+(?P<path>\S+)", user_message, flags=re.IGNORECASE)
+            args = {"operation": "mkdir", "path": (pm.group("path").strip() if pm else "")}
+        elif "list files" in lower:
+            tool_name = "manage_files"
+            pm = re.search(r"list\s+files\s+(?:in\s+)?(?P<path>\S+)", user_message, flags=re.IGNORECASE)
+            args = {"operation": "list", "path": (pm.group("path").strip() if pm else ".")}
+        elif "read file" in lower:
+            tool_name = "manage_files"
+            pm = re.search(r"read\s+file\s+(?P<path>\S+)", user_message, flags=re.IGNORECASE)
+            args = {"operation": "read", "path": (pm.group("path").strip() if pm else "")}
         elif "open " in lower or "launch " in lower:
             tool_name = "open_application"
             app_match = re.search(r"(?:open|launch)\s+(.+)$", user_message, flags=re.IGNORECASE)
@@ -587,6 +688,23 @@ class AIBrain:
                 return f"Opened {result.output.get('opened', '')} in your browser."
             if tool_name == "ai_write_code":
                 return f"Code created at {result.output.get('path', 'src/')}"
+            if tool_name == "manage_files":
+                op = str(result.output.get("action", "operation")).lower()
+                path = result.output.get("path", "")
+                if op == "write":
+                    return f"Created file at {path}."
+                if op == "delete":
+                    return f"Deleted {path}."
+                if op == "mkdir":
+                    return f"Created directory {path}."
+                if op == "list":
+                    items = result.output.get("items", [])
+                    preview = ", ".join(items[:8]) if isinstance(items, list) else ""
+                    return f"Files in {path}: {preview}" if preview else f"Listed files in {path}."
+                if op == "read":
+                    content = str(result.output.get("content", "")).strip()
+                    snippet = (content[:280] + "...") if len(content) > 280 else content
+                    return f"Read {path}: {snippet}"
             return f"Done. {tool_name} executed successfully."
 
         if result.status == "requires_confirmation":
