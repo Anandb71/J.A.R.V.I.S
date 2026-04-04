@@ -94,7 +94,11 @@ async def chat_stream(payload: ChatRequest, request: Request) -> StreamingRespon
 
 @router.get("/tool-policy-check/{tool_name}")
 async def tool_policy_check(tool_name: str) -> dict[str, str | bool]:
-    decision = evaluate_tool_request(tool_name)
+    decision = evaluate_tool_request(
+        tool_name,
+        auto_approve=settings.auto_approve_tools,
+        internet_enabled=settings.internet_enabled,
+    )
     return {
         "tool": decision.name,
         "allowed": decision.allowed,

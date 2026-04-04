@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 import platform
+import re
 import subprocess
 import time
 import uuid
@@ -15,6 +16,7 @@ from typing import Any
 import httpx
 
 from backend.api.websocket_hub import BroadcastMessage, WebSocketHub
+from backend.config import Settings
 from backend.core.tools import TOOL_RISK_TIERS, evaluate_tool_request
 from backend.logging import get_logger
 from backend.security.audit import log_tool_invocation
@@ -36,7 +38,8 @@ class ToolExecutionResult:
 
 
 class ToolExecutor:
-    def __init__(self) -> None:
+    def __init__(self, settings: Settings | None = None) -> None:
+        self.settings = settings or Settings()
         self._pending_confirmations: dict[str, asyncio.Future[bool]] = {}
         self._aliases: dict[str, str] = {
             "get_screen_info": "system_info",
@@ -50,6 +53,13 @@ class ToolExecutor:
             "datetime": "get_datetime",
             "weather": "get_weather",
             "web_search": "search_web",
+            "browse": "open_url",
+            "open_website": "open_url",
+            "visit_website": "open_url",
+            "fetch_url": "fetch_webpage",
+            "write_code": "ai_write_code",
+            "create_code": "ai_write_code",
+            "create_tool": "ai_write_code",
         }
 
     async def execute(
@@ -60,7 +70,12 @@ class ToolExecutor:
     ) -> ToolExecutionResult:
         args = arguments or {}
         normalized_tool = self._normalize_tool_name(tool_name)
-        decision = evaluate_tool_request(normalized_tool, args)
+        decision = evaluate_tool_request(
+            normalized_tool,
+            args,
+            auto_approve=self.settings.auto_approve_tools,
+            internet_enabled=self.settings.internet_enabled,
+        )
         log.info(
             "tools.execute.request",
             tool_name=normalized_tool,
@@ -140,11 +155,14 @@ class ToolExecutor:
             "system_info": self._system_info,
             "open_application": self._open_application,
             "search_web": self._search_web,
+            "fetch_webpage": self._fetch_webpage,
+            "open_url": self._open_url,
             "set_reminder": self._set_reminder,
             "control_volume": self._control_volume,
             "control_brightness": self._control_brightness,
             "run_command": self._run_command,
             "manage_files": self._manage_files,
+            "ai_write_code": self._ai_write_code,
             "get_datetime": self._get_datetime,
             "get_weather": self._get_weather,
         }.get(tool_name)
@@ -215,6 +233,12 @@ class ToolExecutor:
             )
 
     async def _search_web(self, args: dict[str, Any]) -> ToolExecutionResult:
+        if not self.settings.internet_enabled:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="search_web",
+                output={"error": "Internet access is disabled in settings."},
+            )
         query = str(args.get("query", "")).strip()
         if not query:
             return ToolExecutionResult(status="error", tool_name="search_web", output={"error": "Missing query"})
@@ -251,6 +275,102 @@ class ToolExecutor:
                 status="error",
                 tool_name="search_web",
                 output={"error": f"Search failed: {exc}", "query": query},
+            )
+
+    async def _fetch_webpage(self, args: dict[str, Any]) -> ToolExecutionResult:
+        if not self.settings.internet_enabled:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="fetch_webpage",
+                output={"error": "Internet access is disabled in settings."},
+            )
+
+        raw_url = str(args.get("url", "")).strip()
+        if not raw_url:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="fetch_webpage",
+                output={"error": "Missing url"},
+            )
+
+        url = raw_url if raw_url.startswith(("http://", "https://")) else f"https://{raw_url}"
+
+        try:
+            html = ""
+            final_url = url
+            status_code = 0
+
+            try:
+                async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+                    resp = await client.get(url)
+                    resp.raise_for_status()
+                    html = resp.text or ""
+                    final_url = str(resp.url)
+                    status_code = resp.status_code
+            except httpx.ConnectError as exc:
+                # Fallback for environments missing proper CA chain.
+                if "CERTIFICATE_VERIFY_FAILED" not in str(exc):
+                    raise
+                async with httpx.AsyncClient(timeout=12.0, follow_redirects=True, verify=False) as client:
+                    resp = await client.get(url)
+                    resp.raise_for_status()
+                    html = resp.text or ""
+                    final_url = str(resp.url)
+                    status_code = resp.status_code
+
+            # Lightweight html-to-text cleanup
+            text = re.sub(r"<script[\\s\\S]*?</script>", " ", html, flags=re.IGNORECASE)
+            text = re.sub(r"<style[\\s\\S]*?</style>", " ", text, flags=re.IGNORECASE)
+            text = re.sub(r"<[^>]+>", " ", text)
+            text = re.sub(r"\\s+", " ", text).strip()
+
+            return ToolExecutionResult(
+                status="ok",
+                tool_name="fetch_webpage",
+                output={
+                    "url": final_url,
+                    "status_code": status_code,
+                    "title": self._extract_html_title(html),
+                    "content": text[:5000],
+                },
+            )
+        except Exception as exc:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="fetch_webpage",
+                output={"error": f"Fetch failed: {exc}", "url": url},
+            )
+
+    async def _open_url(self, args: dict[str, Any]) -> ToolExecutionResult:
+        if not self.settings.internet_enabled:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="open_url",
+                output={"error": "Internet access is disabled in settings."},
+            )
+
+        raw_url = str(args.get("url", "")).strip()
+        if not raw_url:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="open_url",
+                output={"error": "Missing url"},
+            )
+
+        url = raw_url if raw_url.startswith(("http://", "https://")) else f"https://{raw_url}"
+
+        try:
+            subprocess.Popen(["cmd", "/c", "start", "", url], shell=False)
+            return ToolExecutionResult(
+                status="ok",
+                tool_name="open_url",
+                output={"opened": url},
+            )
+        except Exception as exc:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="open_url",
+                output={"error": str(exc), "url": url},
             )
 
     async def _set_reminder(self, args: dict[str, Any]) -> ToolExecutionResult:
@@ -467,6 +587,116 @@ class ToolExecutor:
                 output={"error": str(exc)},
             )
 
+    async def _ai_write_code(self, args: dict[str, Any]) -> ToolExecutionResult:
+        task = str(args.get("task", "")).strip()
+        path_value = str(args.get("path", "")).strip()
+        language = str(args.get("language", "")).strip().lower()
+
+        if not task:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="ai_write_code",
+                output={"error": "Missing task"},
+            )
+
+        if not path_value:
+            extension_map = {
+                "typescript": ".ts",
+                "javascript": ".js",
+                "python": ".py",
+                "css": ".css",
+                "html": ".html",
+                "json": ".json",
+            }
+            ext = extension_map.get(language, ".ts")
+            slug = re.sub(r"[^a-zA-Z0-9]+", "-", task).strip("-").lower()[:48] or "generated"
+            path_value = f"src/ai_generated/{slug}{ext}"
+
+        try:
+            target = self._resolve_src_path(path_value)
+            target.parent.mkdir(parents=True, exist_ok=True)
+
+            generated = await self._generate_code(task=task, path=str(target), language=language)
+            cleaned = self._strip_code_fences(generated).strip()
+
+            if not cleaned:
+                return ToolExecutionResult(
+                    status="error",
+                    tool_name="ai_write_code",
+                    output={"error": "Model returned empty code."},
+                )
+
+            target.write_text(cleaned + "\n", encoding="utf-8")
+
+            return ToolExecutionResult(
+                status="ok",
+                tool_name="ai_write_code",
+                output={
+                    "path": str(target),
+                    "bytes": len(cleaned.encode("utf-8")),
+                    "language": language or "auto",
+                    "message": "Code written successfully.",
+                },
+            )
+        except Exception as exc:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="ai_write_code",
+                output={"error": str(exc)},
+            )
+
+    async def _generate_code(self, task: str, path: str, language: str) -> str:
+        lang_hint = language or "best fit"
+        payload: dict[str, Any] = {
+            "model": self.settings.local_model,
+            "stream": False,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You write production-ready source code. "
+                        "Return only raw code for a single file. No markdown fences. "
+                        "Avoid introducing external dependencies unless the user explicitly asks for them."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Create code for file: {path}\n"
+                        f"Language: {lang_hint}\n"
+                        f"Task: {task}\n"
+                        "Include imports and minimal comments only where needed."
+                    ),
+                },
+            ],
+            "options": {"temperature": 0.2},
+        }
+
+        url = f"{self.settings.local_ai_url.rstrip('/')}/api/chat"
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+            data = response.json()
+        return str(data.get("message", {}).get("content", "")).strip()
+
+    @staticmethod
+    def _strip_code_fences(text: str) -> str:
+        cleaned = text.strip()
+        cleaned = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+        return cleaned
+
+    @staticmethod
+    def _resolve_src_path(value: str) -> Path:
+        candidate = Path(value)
+        if not candidate.is_absolute():
+            candidate = WORKSPACE_ROOT / candidate
+        resolved = candidate.resolve()
+        src_root = (WORKSPACE_ROOT / "src").resolve()
+        if src_root not in resolved.parents and resolved != src_root:
+            raise ValueError("ai_write_code can only write inside src/")
+        return resolved
+
     async def _get_datetime(self, _args: dict[str, Any]) -> ToolExecutionResult:
         now = datetime.now()
         return ToolExecutionResult(
@@ -483,6 +713,13 @@ class ToolExecutor:
         )
 
     async def _get_weather(self, args: dict[str, Any]) -> ToolExecutionResult:
+        if not self.settings.internet_enabled:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="get_weather",
+                output={"error": "Internet access is disabled in settings."},
+            )
+
         city = str(args.get("city", "")).strip()
         if not city:
             return ToolExecutionResult(
@@ -551,6 +788,13 @@ class ToolExecutor:
                 tool_name="get_weather",
                 output={"error": f"Weather lookup failed: {exc}"},
             )
+
+    @staticmethod
+    def _extract_html_title(html: str) -> str:
+        m = re.search(r"<title>([\\s\\S]*?)</title>", html or "", flags=re.IGNORECASE)
+        if not m:
+            return ""
+        return re.sub(r"\\s+", " ", m.group(1)).strip()[:300]
 
     @staticmethod
     def _wmo_to_text(code: int) -> str:

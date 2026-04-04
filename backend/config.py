@@ -32,6 +32,8 @@ class Settings:
     gesture_enabled: bool = os.getenv("JARVIS_GESTURE_ENABLED", "false").lower() == "true"
     gesture_camera_index: int = int(os.getenv("JARVIS_GESTURE_CAMERA_INDEX", "0"))
     system_metrics_interval: float = float(os.getenv("JARVIS_SYSTEM_METRICS_INTERVAL", "1.0"))
+    auto_approve_tools: bool = os.getenv("JARVIS_AUTO_APPROVE_TOOLS", "true").lower() == "true"
+    internet_enabled: bool = os.getenv("JARVIS_INTERNET_ENABLED", "true").lower() == "true"
 
 
 settings = Settings()

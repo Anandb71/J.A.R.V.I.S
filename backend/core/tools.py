@@ -15,6 +15,8 @@ class ToolRisk(IntEnum):
 TOOL_RISK_TIERS: dict[str, ToolRisk] = {
     "system_info": ToolRisk.SAFE,
     "search_web": ToolRisk.SAFE,
+    "fetch_webpage": ToolRisk.SAFE,
+    "open_url": ToolRisk.SAFE,
     "set_reminder": ToolRisk.SAFE,
     "get_datetime": ToolRisk.SAFE,
     "get_weather": ToolRisk.SAFE,
@@ -23,7 +25,10 @@ TOOL_RISK_TIERS: dict[str, ToolRisk] = {
     "control_brightness": ToolRisk.VISUAL,
     "run_command": ToolRisk.KEYBOARD,
     "manage_files": ToolRisk.KEYBOARD,
+    "ai_write_code": ToolRisk.KEYBOARD,
 }
+
+INTERNET_TOOLS = {"search_web", "fetch_webpage", "open_url", "get_weather"}
 
 
 OLLAMA_TOOL_SCHEMAS: list[dict[str, Any]] = [
@@ -74,6 +79,40 @@ OLLAMA_TOOL_SCHEMAS: list[dict[str, Any]] = [
                     }
                 },
                 "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fetch_webpage",
+            "description": "Fetch and summarize text content from a webpage URL.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "Page URL to fetch, e.g. https://example.com.",
+                    }
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_url",
+            "description": "Open a website URL in the user's default browser.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "URL to open in browser.",
+                    }
+                },
+                "required": ["url"],
             },
         },
     },
@@ -164,6 +203,31 @@ OLLAMA_TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "ai_write_code",
+            "description": "Generate code from a task description and write it to a file under src/.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "What code to create.",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Target file path inside src/, e.g. src/features/weather/widget.ts.",
+                    },
+                    "language": {
+                        "type": "string",
+                        "description": "Optional language hint (typescript, javascript, python, css, html, json).",
+                    },
+                },
+                "required": ["task"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_datetime",
             "description": "Get current date, time, day of week, and timezone.",
             "parameters": {"type": "object", "properties": {}},
@@ -197,12 +261,20 @@ class ToolDecision:
     reason: str = ""
 
 
-def evaluate_tool_request(tool_name: str, arguments: dict[str, Any] | None = None) -> ToolDecision:
+def evaluate_tool_request(
+    tool_name: str,
+    arguments: dict[str, Any] | None = None,
+    auto_approve: bool = False,
+    internet_enabled: bool = True,
+) -> ToolDecision:
     _ = arguments or {}
 
     tier = TOOL_RISK_TIERS.get(tool_name)
     if tier is None:
         return ToolDecision(name=tool_name, allowed=False, reason="tool_not_registered")
+
+    if tool_name in INTERNET_TOOLS and not internet_enabled:
+        return ToolDecision(name=tool_name, allowed=False, reason="internet_disabled")
 
     if tier == ToolRisk.DENY:
         return ToolDecision(name=tool_name, allowed=False, reason="hardcoded_deny")
@@ -211,6 +283,8 @@ def evaluate_tool_request(tool_name: str, arguments: dict[str, Any] | None = Non
         return ToolDecision(name=tool_name, allowed=True, reason="tier_safe")
 
     if tier in {ToolRisk.VISUAL, ToolRisk.KEYBOARD}:
+        if auto_approve:
+            return ToolDecision(name=tool_name, allowed=True, reason="auto_approved")
         return ToolDecision(
             name=tool_name,
             allowed=False,
