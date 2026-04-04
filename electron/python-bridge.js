@@ -7,8 +7,10 @@ class PythonBridge {
   constructor() {
     this.process = null;
     this.restarts = 0;
-    this.maxRestarts = 3;
+    this.maxRestarts = 12;
     this.intentionalStop = false;
+    this.restartTimer = null;
+    this.bindConflictDetected = false;
   }
 
   start() {
@@ -29,6 +31,7 @@ class PythonBridge {
     }
 
     this.intentionalStop = false;
+    this.bindConflictDetected = false;
     this.process = spawn(cmd, args, {
       cwd: runtimeRoot,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -40,22 +43,43 @@ class PythonBridge {
     });
 
     this.process.stderr.on('data', (chunk) => {
-      console.error(`[python:err] ${chunk.toString().trim()}`);
+      const text = chunk.toString().trim();
+      if (text.includes('error while attempting to bind on address') || text.includes('Only one usage of each socket address')) {
+        this.bindConflictDetected = true;
+      }
+      console.error(`[python:err] ${text}`);
+    });
+
+    this.process.on('error', (error) => {
+      console.error(`[python:spawn:error] ${error?.message || error}`);
     });
 
     this.process.on('exit', (code) => {
       const wasIntentional = this.intentionalStop;
       this.process = null;
 
+      if (this.bindConflictDetected) {
+        console.warn('Python backend port already in use; assuming backend is already running and skipping auto-restart.');
+        return;
+      }
+
       if (!wasIntentional && this.restarts < this.maxRestarts) {
         this.restarts += 1;
-        console.warn(`Python backend exited (${code}). Restarting (${this.restarts}/${this.maxRestarts})...`);
-        setTimeout(() => this.start(), 1200);
+        const backoffMs = Math.min(1200 * (2 ** (this.restarts - 1)), 12000);
+        console.warn(`Python backend exited (${code}). Restarting (${this.restarts}/${this.maxRestarts}) in ${backoffMs}ms...`);
+        this.restartTimer = setTimeout(() => {
+          this.restartTimer = null;
+          this.start();
+        }, backoffMs);
       }
     });
   }
 
   stop() {
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
     if (!this.process) return;
 
     this.intentionalStop = true;
