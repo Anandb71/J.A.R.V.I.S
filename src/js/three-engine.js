@@ -6,6 +6,7 @@ export class ThreeEngine {
     this.pendingState = 'idle';
     this.pendingAudioLevel = 0;
     this.pendingTier = this._detectTier();
+    this._tiers = ['high', 'medium', 'low'];
 
     const rect = canvasElement.getBoundingClientRect();
     const offscreen = canvasElement.transferControlToOffscreen();
@@ -18,6 +19,9 @@ export class ThreeEngine {
       }
       if (message.type === 'fps_warning' && options.onFpsWarning) {
         options.onFpsWarning(message);
+      }
+      if (message.type === 'fps_warning') {
+        this._handleFpsWarning(message);
       }
       if (message.type === 'log' && options.onLog) {
         options.onLog(message);
@@ -95,5 +99,15 @@ export class ThreeEngine {
     if (cores >= 8 && mem >= 8) return 'high';
     if (cores >= 4 && mem >= 4) return 'medium';
     return 'low';
+  }
+
+  _handleFpsWarning(message) {
+    const current = typeof message?.tier === 'string' ? message.tier : this.pendingTier;
+    const idx = this._tiers.indexOf(current);
+    if (idx < 0 || idx >= this._tiers.length - 1) return;
+    const nextTier = this._tiers[idx + 1];
+    if (nextTier !== this.pendingTier) {
+      this.setTier(nextTier);
+    }
   }
 }

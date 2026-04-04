@@ -18,12 +18,9 @@ Audio contract:
 """
 
 import asyncio
-import os
-import tempfile
-import wave
 import warnings
 
-from faster_whisper import WhisperModel
+import numpy as np
 
 from backend.api.websocket_hub import BroadcastMessage
 from backend.logging import get_logger
@@ -185,32 +182,20 @@ class DuplexVoicePipeline:
         if self._stt_model is None:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
+                from faster_whisper import WhisperModel
+
                 self._stt_model = WhisperModel(
                     "base", device="cpu", compute_type="int8"
                 )
                 log.info("voice.stt.model_loaded", model="base", device="cpu")
 
-        # Convert PCM16 bytes → WAV file in temp storage
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            with wave.open(tmp, "wb") as wav_file:
-                wav_file.setnchannels(self.CHANNELS)
-                wav_file.setsampwidth(self.SAMPLE_WIDTH)
-                wav_file.setframerate(self.SAMPLE_RATE)
-                wav_file.writeframes(audio)
-            tmp_path = tmp.name
+        audio_np = np.frombuffer(audio, dtype=np.int16).astype(np.float32) / 32768.0
 
-        # Transcribe
-        try:
-            async with alatency("voice.stt"):
-                segments, _ = self._stt_model.transcribe(
-                    tmp_path, language="en", beam_size=1
-                )
-                text = " ".join(seg.text for seg in segments).strip()
-        finally:
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
+        async with alatency("voice.stt"):
+            segments, _ = self._stt_model.transcribe(
+                audio_np, language="en", beam_size=1
+            )
+            text = " ".join(seg.text for seg in segments).strip()
 
         return text
 

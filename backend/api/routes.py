@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from backend.api.schemas import ChatRequest, ChatResponse
 from backend.config import settings
 from backend.core.tools import evaluate_tool_request
+from backend.utils.timing import get_all_latency_stats
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -195,3 +196,17 @@ async def vision_capture(request: Request) -> dict:
     normalized_region = tuple(region) if isinstance(region, list) and len(region) == 4 else None
     vision = request.app.state.vision
     return vision.capture_screen(region=normalized_region)
+
+
+@router.get("/debug/latency")
+async def debug_latency() -> dict:
+    return get_all_latency_stats()
+
+
+@router.get("/gesture/status")
+async def gesture_status(request: Request) -> dict:
+    tracker = request.app.state.gesture_tracker
+    return {
+        "enabled": bool(tracker.is_running),
+        "camera_index": tracker.camera_index,
+    }

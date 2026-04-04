@@ -24,6 +24,7 @@ class RAGMemory:
         self._model = embedding_model
         self._sliding_window: list[dict[str, str]] = []
         self._lock = asyncio.Lock()
+        self._chroma_semaphore = asyncio.Semaphore(1)
 
         self.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         self.CHROMA_PATH.mkdir(parents=True, exist_ok=True)
@@ -124,23 +125,25 @@ class RAGMemory:
         }
 
     async def _embed_and_store(self, role: str, content: str) -> None:
-        try:
-            embedding = await asyncio.to_thread(self._model.encode, content)
-            self._collection.add(
-                ids=[f"{self.session_id}_{uuid.uuid4().hex[:8]}"],
-                embeddings=[embedding.tolist()],
-                documents=[content],
-                metadatas=[
-                    {
-                        "role": role,
-                        "session_id": self.session_id,
-                        "created_at": datetime.utcnow().isoformat(),
-                    }
-                ],
-            )
-        except Exception:
-            # Non-blocking background storage path: ignore failures.
-            return
+        async with self._chroma_semaphore:
+            try:
+                embedding = await asyncio.to_thread(self._model.encode, content)
+                await asyncio.to_thread(
+                    self._collection.add,
+                    ids=[f"{self.session_id}_{uuid.uuid4().hex[:8]}"],
+                    embeddings=[embedding.tolist()],
+                    documents=[content],
+                    metadatas=[
+                        {
+                            "role": role,
+                            "session_id": self.session_id,
+                            "created_at": datetime.utcnow().isoformat(),
+                        }
+                    ],
+                )
+            except Exception:
+                # Non-blocking background storage path: ignore failures.
+                return
 
     def _format_retrieved(self, retrieved: list[dict[str, str]]) -> str:
         lines = []
