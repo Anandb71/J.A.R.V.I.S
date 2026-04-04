@@ -1,6 +1,7 @@
 :root {
   --bg: rgba(10, 14, 26, 0.48);
-  --panel: rgba(10, 22, 40, 0.66);
+  --panel: rgba(10, 22, 40, 0.72);
+  --panel-strong: rgba(7, 12, 22, 0.9);
   --line: rgba(0, 180, 255, 0.45);
   --cyan: #00b4ff;
   --orange: #ff6b35;
@@ -11,6 +12,7 @@
   --warn: #ffb800;
   --danger: #ff3366;
   --radius: 14px;
+  --shadow: 0 0 24px rgba(0, 180, 255, 0.18);
 }
 
 * {
@@ -23,7 +25,8 @@ body {
   height: 100%;
   font-family: Inter, Segoe UI, Arial, sans-serif;
   color: var(--text);
-  background: transparent;
+  background: radial-gradient(circle at 50% 15%, rgba(0, 180, 255, 0.08), transparent 35%), transparent;
+  overflow: hidden;
 }
 
 .hud-panel {
@@ -31,7 +34,7 @@ body {
   border-radius: var(--radius);
   background: var(--panel);
   backdrop-filter: blur(10px);
-  box-shadow: 0 0 24px rgba(0, 180, 255, 0.18);
+  box-shadow: var(--shadow);
 }
 
 .status-pill {
@@ -63,4 +66,20 @@ body {
 
 .hud-btn:hover {
   background: rgba(0, 180, 255, 0.2);
+}
+
+.glass-dark {
+  background: var(--panel-strong);
+}
+
+.neon-cyan {
+  box-shadow: 0 0 12px rgba(0, 180, 255, 0.45);
+}
+
+.neon-orange {
+  box-shadow: 0 0 12px rgba(255, 107, 53, 0.35);
+}
+
+.neon-purple {
+  box-shadow: 0 0 12px rgba(180, 77, 255, 0.35);
 }

@@ -13,6 +13,8 @@ from backend.config import settings
 from backend.core.brain import AIBrain
 from backend.core.memory import RAGMemory
 from backend.core.router import SemanticRouter
+from backend.logging import configure_logging
+from backend.system.monitor import SystemMonitor
 from backend.voice.audio_manager import VoiceManager
 from backend.vision.manager import VisionManager
 
@@ -35,20 +37,26 @@ async def heartbeat_task() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    configure_logging(dev_mode=True)
     embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
     semantic_router = SemanticRouter(model=embedding_model, privacy_mode=settings.privacy_mode)
     rag_memory = RAGMemory(embedding_model=embedding_model)
     _app.state.vision = VisionManager.from_settings(settings)
     _app.state.brain = AIBrain(settings, router=semantic_router, memory=rag_memory, vision=_app.state.vision)
     _app.state.voice = VoiceManager.from_settings(brain=_app.state.brain, hub=hub, settings=settings)
+    _app.state.system_monitor = SystemMonitor(hub=hub, interval=settings.system_metrics_interval)
     _app.state.hub = hub
     task = asyncio.create_task(heartbeat_task())
+    metrics_task = asyncio.create_task(_app.state.system_monitor.run())
     try:
         yield
     finally:
         task.cancel()
+        metrics_task.cancel()
         with suppress(asyncio.CancelledError):
             await task
+        with suppress(asyncio.CancelledError):
+            await metrics_task
 
 
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)

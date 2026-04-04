@@ -12,6 +12,7 @@
     "typecheck": "echo \"Typecheck not configured yet\""
   },
   "dependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "three": "^0.170.0"
   }
 }

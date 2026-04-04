@@ -3,7 +3,7 @@
   height: 100vh;
   padding: 16px;
   display: grid;
-  grid-template-columns: 260px 1fr 320px;
+  grid-template-columns: 280px 1fr 360px;
   grid-template-rows: auto 1fr auto;
   gap: 12px;
 }
@@ -22,9 +22,15 @@
 }
 
 .center-panel {
-  display: grid;
-  place-items: center;
+  position: relative;
+  overflow: hidden;
   min-height: 240px;
+}
+
+.three-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .bottom-bar {
@@ -36,18 +42,12 @@
 }
 
 .orb-wrap {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
   gap: 10px;
-}
-
-.orb {
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #9ce8ff, #00b4ff 45%, #093d5b 70%, #07121f 100%);
-  box-shadow: 0 0 40px rgba(0, 180, 255, 0.6), inset 0 0 30px rgba(255, 255, 255, 0.2);
-  animation: breathe 2.4s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .orb-label {
@@ -56,21 +56,89 @@
   color: var(--muted);
 }
 
-.log-box {
+.voice-state {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(0, 180, 255, 0.08);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.gauges-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.gauges-grid canvas {
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.chat-panel {
   margin-top: 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px;
-  min-height: 140px;
+  min-height: 360px;
+  max-height: 560px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.chat-meta {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.chat-body {
   font-family: Consolas, monospace;
   font-size: 12px;
-  color: #c6e6ff;
   white-space: pre-wrap;
+}
+
+.chat-input-wrap {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.chat-input-wrap input {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(3, 8, 18, 0.8);
+  color: var(--text);
+  padding: 10px 12px;
+}
+
+.chat-input-wrap input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 180, 255, 0.18);
 }
 
 .clock {
   font-size: 18px;
   font-weight: 600;
+}
+
+.log-box {
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  color: #c6e6ff;
+  white-space: pre-wrap;
 }
 
 @keyframes breathe {
