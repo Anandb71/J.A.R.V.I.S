@@ -379,7 +379,10 @@ class AIBrain:
         triggers = (
             "open ", "launch ", "set ", "turn ", "increase ", "decrease ", "dim ",
             "brightness", "volume", "remind", "create file", "delete file", "run ",
-            "what's my cpu", "what is my cpu", "weather in", "time in", "get weather",
+            "what's my cpu", "what is my cpu", "cpu usage", "memory usage", "disk usage",
+            "weather in", "time in", "get weather",
+            "search web", "search for", "write code", "generate code", "create tool",
+            "open website", "visit website", "open url", "fetch webpage", "summarize this page",
         )
         return any(t in text for t in triggers)
 
@@ -433,6 +436,30 @@ class AIBrain:
                 response_part = response_part[1:-1]
             return response_part.strip()
 
+        # Handle multiline leaks such as:
+        # action='direct_response'\nHello there.
+        lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+        if lines and re.match(r"^action\s*=", lines[0], flags=re.IGNORECASE):
+            action_match = re.search(r"action\s*=\s*['\"]?(?P<action>[a-z_]+)['\"]?", lines[0], flags=re.IGNORECASE)
+            action = (action_match.group("action").lower() if action_match else "")
+
+            if action == "direct_response":
+                body = "\n".join(lines[1:]).strip()
+                if body:
+                    return body
+
+            if action in {"status", "state"}:
+                status_match = re.search(r"status\s*=\s*['\"]?(?P<status>[^'\"\n]+)", cleaned, flags=re.IGNORECASE)
+                status = status_match.group("status").strip() if status_match else "online"
+                return f"I am {status}."
+
+            if action == "tool_call":
+                tool_match = re.search(r"tool_name\s*=\s*['\"]?(?P<tool>[A-Za-z0-9_:-]+)", cleaned)
+                tool_name = (tool_match.group("tool").lower() if tool_match else "")
+                if tool_name in {"system_info", "get_system_info", "screen_info", "get_screen_info"}:
+                    return "I can check system status, weather, time, and help with desktop actions like launching apps or adjusting controls."
+                return "I can help with tool actions—tell me exactly what you'd like me to do."
+
         return cleaned
 
     async def _rule_based_tool_reply(
@@ -450,6 +477,15 @@ class AIBrain:
         tool_name: str | None = None
         args: dict[str, Any] = {}
 
+        if re.search(r"\bwhat\s+can\s+you\s+do\b", lower):
+            return (
+                "I can check system status, weather, and time; search the web; and perform desktop actions "
+                "like launching apps or adjusting brightness and volume (with confirmation for sensitive actions)."
+            )
+
+        if re.search(r"\b(what\s+is\s+your\s+status|status)\b", lower) and "weather" not in lower:
+            return "I am online and ready."
+
         # Weather: "weather in <city>"
         weather_match = re.search(r"weather\s+in\s+([a-zA-Z\s\-]+)$", lower)
         if weather_match:
@@ -464,14 +500,36 @@ class AIBrain:
         elif "cpu" in lower or "ram" in lower or "memory" in lower or "system info" in lower:
             tool_name = "system_info"
             args = {}
-        elif "search" in lower and "web" in lower:
+        elif "search for" in lower or ("search" in lower and "web" in lower):
             tool_name = "search_web"
-            q = re.sub(r".*search\s+web\s+(for\s+)?", "", user_message, flags=re.IGNORECASE).strip()
+            q = re.sub(r".*search\s+(?:web\s+)?(?:for\s+)?", "", user_message, flags=re.IGNORECASE).strip()
             args = {"query": q or user_message}
+        elif any(x in lower for x in ("open website", "visit website", "open url", "go to ")):
+            tool_name = "open_url"
+            url = self._extract_url_from_text(user_message)
+            if not url:
+                url = re.sub(r".*(?:open\s+website|visit\s+website|open\s+url|go\s+to)\s+", "", user_message, flags=re.IGNORECASE).strip()
+            args = {"url": url}
+        elif any(x in lower for x in ("fetch webpage", "summarize this page", "read this page")):
+            tool_name = "fetch_webpage"
+            url = self._extract_url_from_text(user_message)
+            if not url:
+                url = re.sub(r".*(?:fetch\s+webpage|summarize\s+this\s+page|read\s+this\s+page)\s+", "", user_message, flags=re.IGNORECASE).strip()
+            args = {"url": url}
         elif "open " in lower or "launch " in lower:
             tool_name = "open_application"
             app_match = re.search(r"(?:open|launch)\s+(.+)$", user_message, flags=re.IGNORECASE)
             args = {"name": (app_match.group(1).strip() if app_match else "notepad")}
+        elif "disk" in lower:
+            tool_name = "system_info"
+            args = {}
+        elif "write code" in lower or "generate code" in lower or "create tool" in lower:
+            tool_name = "ai_write_code"
+            path_match = re.search(r"(?:in|to|at)\s+(src[\\/][^\s]+)", user_message, flags=re.IGNORECASE)
+            args = {
+                "task": user_message,
+                "path": (path_match.group(1) if path_match else ""),
+            }
         elif "brightness" in lower or "dim" in lower:
             tool_name = "control_brightness"
             num = re.search(r"(\d{1,3})", lower)
@@ -520,6 +578,15 @@ class AIBrain:
                     f"CPU {result.output.get('cpu_percent', 'N/A')}%, "
                     f"Memory {result.output.get('memory_percent', 'N/A')}%."
                 )
+            if tool_name == "fetch_webpage":
+                title = result.output.get("title", "")
+                content = str(result.output.get("content", ""))
+                snippet = (content[:280] + "...") if len(content) > 280 else content
+                return f"Fetched page {result.output.get('url', '')}. {('Title: ' + title + '. ') if title else ''}{snippet}"
+            if tool_name == "open_url":
+                return f"Opened {result.output.get('opened', '')} in your browser."
+            if tool_name == "ai_write_code":
+                return f"Code created at {result.output.get('path', 'src/')}"
             return f"Done. {tool_name} executed successfully."
 
         if result.status == "requires_confirmation":
@@ -590,6 +657,11 @@ class AIBrain:
     @staticmethod
     def _latency_ms(start: float) -> int:
         return int((time.perf_counter() - start) * 1000)
+
+    @staticmethod
+    def _extract_url_from_text(text: str) -> str:
+        m = re.search(r"(https?://[^\s]+)", text or "", flags=re.IGNORECASE)
+        return m.group(1).strip() if m else ""
     
     async def get_memory_stats(self) -> dict[str, Any]:
         """Get current conversation memory statistics"""
