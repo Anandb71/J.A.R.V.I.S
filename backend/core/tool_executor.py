@@ -49,6 +49,7 @@ class ToolExecutor:
             "set_volume": "control_volume",
             "datetime": "get_datetime",
             "weather": "get_weather",
+            "web_search": "search_web",
         }
 
     async def execute(

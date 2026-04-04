@@ -109,10 +109,14 @@ class AIBrain:
 
         if force_tool_mode or route.intent in self.TOOL_ELIGIBLE_INTENTS:
             try:
-                reply_text = await self._chat_local_structured(messages)
+                rule_reply = await self._rule_based_tool_reply(message, hub=None, websocket=None)
+                if rule_reply is not None:
+                    reply_text = rule_reply
+                else:
+                    reply_text = await self._chat_local_structured(messages)
                 log.info("brain.chat.structured_reply")
             except Exception as exc:
-                reply_text = f"Tool pipeline failed. Falling back to direct reply. Details: {exc}"
+                reply_text = await self._chat_local_text(messages)
                 fallback_used = True
                 log.warning("brain.chat.structured_failed", error=str(exc))
         else:
@@ -188,7 +192,11 @@ class AIBrain:
             force_tool_mode = self._looks_like_tool_request(message)
 
             if force_tool_mode or route.intent in self.TOOL_ELIGIBLE_INTENTS:
-                response = await self._chat_local_structured(messages, hub=hub, websocket=websocket)
+                rule_reply = await self._rule_based_tool_reply(message, hub=hub, websocket=websocket)
+                if rule_reply is not None:
+                    response = rule_reply
+                else:
+                    response = await self._chat_local_structured(messages, hub=hub, websocket=websocket)
                 full_response = response
                 await emit("brain:chunk", {"text": response, "done": False})
                 yield response
@@ -294,7 +302,9 @@ class AIBrain:
                 await hub.broadcast(message)
 
         if result.status in {"denied", "error", "requires_confirmation"}:
-            return f"Tool '{tool_name}' could not run: {result.output}"
+            # Graceful fallback to natural response instead of noisy internal error text.
+            fallback = await self._chat_local_text(messages)
+            return fallback
 
         followup_messages = list(messages)
         followup_messages.append(
@@ -413,7 +423,7 @@ class AIBrain:
         # action="direct_response" response='...'
         # action=direct_response response=...
         pattern = re.compile(
-            r"action\s*=\s*['\"]?direct_response['\"]?\s+response\s*=\s*(?P<resp>.+)$",
+            r"action\s*=\s*['\"]?[a-z_]+['\"]?\s+response\s*=\s*(?P<resp>.+)$",
             flags=re.IGNORECASE | re.DOTALL,
         )
         match = pattern.search(cleaned)
@@ -424,6 +434,98 @@ class AIBrain:
             return response_part.strip()
 
         return cleaned
+
+    async def _rule_based_tool_reply(
+        self,
+        user_message: str,
+        hub: WebSocketHub | None = None,
+        websocket: WebSocket | None = None,
+    ) -> str | None:
+        """Execute common tool intents deterministically without relying on model JSON formatting."""
+        user_message = str(user_message or "").strip()
+        if not user_message:
+            return None
+
+        lower = user_message.lower()
+        tool_name: str | None = None
+        args: dict[str, Any] = {}
+
+        # Weather: "weather in <city>"
+        weather_match = re.search(r"weather\s+in\s+([a-zA-Z\s\-]+)$", lower)
+        if weather_match:
+            tool_name = "get_weather"
+            args = {"city": weather_match.group(1).strip().title()}
+        elif "weather" in lower and " in " not in lower:
+            tool_name = "get_weather"
+            args = {"city": "Bengaluru"}
+        elif "what time" in lower or "date" in lower or "day" in lower:
+            tool_name = "get_datetime"
+            args = {}
+        elif "cpu" in lower or "ram" in lower or "memory" in lower or "system info" in lower:
+            tool_name = "system_info"
+            args = {}
+        elif "search" in lower and "web" in lower:
+            tool_name = "search_web"
+            q = re.sub(r".*search\s+web\s+(for\s+)?", "", user_message, flags=re.IGNORECASE).strip()
+            args = {"query": q or user_message}
+        elif "open " in lower or "launch " in lower:
+            tool_name = "open_application"
+            app_match = re.search(r"(?:open|launch)\s+(.+)$", user_message, flags=re.IGNORECASE)
+            args = {"name": (app_match.group(1).strip() if app_match else "notepad")}
+        elif "brightness" in lower or "dim" in lower:
+            tool_name = "control_brightness"
+            num = re.search(r"(\d{1,3})", lower)
+            args = {"level": max(0, min(100, int(num.group(1)))) if num else (0 if "dim" in lower else 50)}
+        elif "volume" in lower:
+            tool_name = "control_volume"
+            num = re.search(r"(\d{1,3})", lower)
+            args = {"level": max(0, min(100, int(num.group(1)))) if num else 50}
+
+        if not tool_name:
+            return None
+
+        if hub is not None:
+            msg = BroadcastMessage(
+                event="brain:tool_call",
+                payload={"tool_name": tool_name, "arguments": args, "reasoning": "rule_based"},
+            )
+            if websocket is not None:
+                await hub.send_to(websocket, msg)
+            else:
+                await hub.broadcast(msg)
+
+        result = await self.tool_executor.execute(tool_name, args, hub=hub)
+
+        if hub is not None:
+            msg = BroadcastMessage(
+                event="brain:tool_result",
+                payload={"tool_name": tool_name, "result": result.output, "status": result.status},
+            )
+            if websocket is not None:
+                await hub.send_to(websocket, msg)
+            else:
+                await hub.broadcast(msg)
+
+        if result.status == "ok":
+            if tool_name == "get_weather":
+                c = result.output.get("city", "")
+                t = result.output.get("temperature_c")
+                fl = result.output.get("feels_like_c")
+                cond = result.output.get("condition", "")
+                return f"Current weather in {c}: {t}°C, feels like {fl}°C, {cond}."
+            if tool_name == "get_datetime":
+                return f"It is {result.output.get('formatted', '')}."
+            if tool_name == "system_info":
+                return (
+                    f"CPU {result.output.get('cpu_percent', 'N/A')}%, "
+                    f"Memory {result.output.get('memory_percent', 'N/A')}%."
+                )
+            return f"Done. {tool_name} executed successfully."
+
+        if result.status == "requires_confirmation":
+            return "This action needs your confirmation in the HUD popup before I can execute it."
+
+        return f"I couldn't execute {tool_name} right now: {result.output}."
 
     async def _stream_local(self, messages: list[dict[str, Any]]):
         payload: dict[str, Any] = {
