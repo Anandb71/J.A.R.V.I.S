@@ -7,6 +7,7 @@ export class JarvisSocket {
     this.baseReconnectDelay = 1200;
     this.maxReconnectDelay = 30000;
     this.reconnectAttempts = 0;
+    this.connected = false;
   }
 
   connect() {
@@ -14,6 +15,7 @@ export class JarvisSocket {
     this.ws.binaryType = 'arraybuffer';
 
     this.ws.onopen = () => {
+      this.connected = true;
       this.reconnectAttempts = 0;
       this.emit({ event: 'socket', payload: { state: 'connected' } });
     };
@@ -32,6 +34,7 @@ export class JarvisSocket {
     };
 
     this.ws.onclose = () => {
+      this.connected = false;
       this.emit({ event: 'socket', payload: { state: 'closed' } });
       const delay = Math.min(
         this.baseReconnectDelay * (2 ** this.reconnectAttempts),
@@ -43,13 +46,15 @@ export class JarvisSocket {
     };
 
     this.ws.onerror = () => {
+      this.connected = false;
       this.emit({ event: 'socket', payload: { state: 'error' } });
     };
   }
 
   send(event, payload) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
     this.ws.send(JSON.stringify({ event, payload }));
+    return true;
   }
 
   sendBinary(buffer) {
@@ -69,6 +74,10 @@ export class JarvisSocket {
 
   emit(message) {
     this.listeners.forEach((listener) => listener(message));
+  }
+
+  isOpen() {
+    return Boolean(this.connected && this.ws && this.ws.readyState === WebSocket.OPEN);
   }
 }
 

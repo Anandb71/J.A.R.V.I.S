@@ -10,13 +10,18 @@
  */
 
 export class VoiceClient {
-  constructor(socket, audioTransport, onStateChange) {
+  constructor(socket, audioTransport, onStateChange, onMicLevel) {
     this.socket = socket;
     this.audioTransport = audioTransport;
     this.onStateChange = onStateChange;
+    this.onMicLevel = onMicLevel;
     this.vad = null;
     this.stream = null;
     this.isActive = false;
+    this.audioCtx = null;
+    this.analyser = null;
+    this.micLevelRaf = null;
+    this.levelData = null;
   }
 
   async start() {
@@ -49,11 +54,13 @@ export class VoiceClient {
       });
 
       this.vad.start();
+      this._startMicLevelTracking();
       this.isActive = true;
       this.onStateChange?.('listening');
     } catch (error) {
       this.vad?.destroy?.();
       this.vad = null;
+      this._stopMicLevelTracking();
       if (this.stream) {
         this.stream.getTracks().forEach((track) => track.stop());
         this.stream = null;
@@ -91,9 +98,52 @@ export class VoiceClient {
     this.onStateChange?.('processing');
   }
 
+  _startMicLevelTracking() {
+    if (!this.stream || this.audioCtx) return;
+    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = this.audioCtx.createMediaStreamSource(this.stream);
+    this.analyser = this.audioCtx.createAnalyser();
+    this.analyser.fftSize = 256;
+    this.levelData = new Uint8Array(this.analyser.fftSize);
+    source.connect(this.analyser);
+
+    const tick = () => {
+      if (!this.analyser || !this.levelData) return;
+      this.analyser.getByteTimeDomainData(this.levelData);
+      let sum = 0;
+      for (let i = 0; i < this.levelData.length; i += 1) {
+        const centered = (this.levelData[i] - 128) / 128;
+        sum += centered * centered;
+      }
+      const rms = Math.sqrt(sum / this.levelData.length);
+      const normalized = Math.min(1, rms * 4);
+      this.onMicLevel?.(normalized);
+      this.micLevelRaf = requestAnimationFrame(tick);
+    };
+
+    tick();
+  }
+
+  _stopMicLevelTracking() {
+    if (this.micLevelRaf) {
+      cancelAnimationFrame(this.micLevelRaf);
+      this.micLevelRaf = null;
+    }
+    this.onMicLevel?.(0);
+    this.levelData = null;
+    this.analyser = null;
+    if (this.audioCtx) {
+      this.audioCtx.close().catch(() => {
+        // noop
+      });
+      this.audioCtx = null;
+    }
+  }
+
   stop() {
     this.vad?.destroy?.();
     this.vad = null;
+    this._stopMicLevelTracking();
 
     if (this.stream) {
       this.stream.getTracks().forEach((track) => track.stop());

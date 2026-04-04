@@ -3,49 +3,102 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>JARVIS HUD</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws://127.0.0.1:8765 http://127.0.0.1:8765 http://127.0.0.1:11434; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; font-src 'self' data:;" />
+    <title>J.A.R.V.I.S.</title>
+    <meta name="description" content="Just A Rather Very Intelligent System — Desktop AI Assistant" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws://127.0.0.1:8765 http://127.0.0.1:8765 http://127.0.0.1:11434 https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api.duckduckgo.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; font-src 'self' data:;" />
     <link rel="stylesheet" href="./css/design-system.css" />
     <link rel="stylesheet" href="./css/hud.css" />
   </head>
   <body>
+    <!-- ═══ Main HUD ═══ -->
     <div id="hud-root" class="hud-root">
+
+      <!-- ── Top Bar ── -->
       <header class="hud-panel top-bar">
-        <div class="status-pill online">JARVIS ONLINE</div>
-        <div id="clock" class="clock">--:--:--</div>
-        <div id="backend-status" class="status-pill warn">Backend: starting…</div>
+        <div id="brand-pill" class="status-pill online brand-pill">JARVIS</div>
+
+        <div class="top-center">
+          <div class="top-time-wrap">
+            <div id="clock" class="clock">--:--:--</div>
+            <div id="calendar" class="calendar">--- --- --</div>
+          </div>
+          <div id="top-metrics" class="top-metrics">
+            <span>CPU <span id="top-cpu" class="metric-value">--%</span></span>
+            <span>GPU <span id="top-gpu" class="metric-value">--%</span></span>
+            <span>RAM <span id="top-ram" class="metric-value">--%</span></span>
+          </div>
+        </div>
+
+        <div class="top-right">
+          <span id="top-weather" class="status-pill" style="font-size:10px">☀ --°C</span>
+          <span id="top-battery" class="status-pill" style="font-size:10px">⚡ --%</span>
+          <div id="backend-status" class="status-pill warn">Backend: starting…</div>
+        </div>
       </header>
 
+      <!-- ── Left Panel: System ── -->
       <aside class="hud-panel left-panel">
-        <h2>System</h2>
+        <div class="panel-header">
+          <h2>⚙ System</h2>
+          <button id="btn-collapse-left" class="panel-collapse-btn" aria-label="Collapse system panel">◀</button>
+        </div>
         <div class="gauges-grid">
-          <canvas id="cpu-gauge" width="160" height="160"></canvas>
-          <canvas id="ram-gauge" width="160" height="160"></canvas>
-          <canvas id="gpu-gauge" width="160" height="160"></canvas>
-          <canvas id="net-gauge" width="160" height="160"></canvas>
+          <div class="gauge-card">
+            <canvas id="cpu-gauge" width="140" height="140"></canvas>
+          </div>
+          <div class="gauge-card">
+            <canvas id="ram-gauge" width="140" height="140"></canvas>
+          </div>
+          <div class="gauge-card">
+            <canvas id="gpu-gauge" width="140" height="140"></canvas>
+          </div>
+          <div class="gauge-card">
+            <canvas id="net-gauge" width="140" height="140"></canvas>
+          </div>
+        </div>
+        <div id="sys-details" style="margin-top:8px; font-size:10px; color:var(--text-muted); font-family:'Cascadia Mono','Consolas',monospace; padding: 4px;">
+          <div id="sys-ram-detail">RAM: --/-- GB</div>
+          <div id="sys-gpu-name">GPU: --</div>
+          <div id="sys-disk">Disk: --%</div>
+          <div id="sys-net-detail">↑ 0 KB/s  ↓ 0 KB/s</div>
         </div>
       </aside>
 
+      <!-- ── Center: Three.js Canvas ── -->
       <main class="hud-panel center-panel">
         <canvas id="three-canvas" class="three-canvas"></canvas>
         <div class="orb-wrap">
+          <div class="orb-ring"></div>
           <p class="orb-label">JARVIS Core</p>
-          <div id="voice-state" class="voice-state">idle</div>
+          <div id="voice-state" class="voice-state" data-state="idle">idle</div>
         </div>
       </main>
 
+      <!-- ── Right Panel: Comms ── -->
       <aside class="hud-panel right-panel">
-        <h2>Comms</h2>
+        <div class="panel-header">
+          <h2>💬 Comms</h2>
+          <button id="btn-collapse-right" class="panel-collapse-btn" aria-label="Collapse comms panel">▶</button>
+        </div>
         <div id="chat-panel" class="chat-panel"></div>
         <div class="chat-input-wrap">
           <input id="chat-input" type="text" placeholder="Message JARVIS…" autocomplete="off" />
-          <button id="btn-send" class="hud-btn">Send</button>
+          <button id="btn-send" class="hud-btn primary">Send</button>
         </div>
       </aside>
 
+      <!-- ── Bottom Bar ── -->
       <footer class="hud-panel bottom-bar">
-        <button id="btn-toggle-clickthrough" class="hud-btn">Toggle Click-through</button>
-        <button id="btn-toggle-hud" class="hud-btn">Toggle HUD Visibility</button>
+        <button id="btn-mic" class="hud-btn">🎤 Voice</button>
+        <div class="separator"></div>
+        <button id="btn-toggle-clickthrough" class="hud-btn">🖱 Click-through</button>
+        <button id="btn-toggle-hud" class="hud-btn">👁 Focus</button>
+        <div class="separator"></div>
+        <div class="bottom-info">
+          <span id="ws-status">WS: ●</span>
+          <span id="latency-display" class="latency-badge"></span>
+          <span id="session-id" style="opacity:0.5"></span>
+        </div>
       </footer>
     </div>
 

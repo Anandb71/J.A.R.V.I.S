@@ -15,6 +15,7 @@ let rings = [];
 let ambient;
 let state = 'idle';
 let audioLevel = 0;
+let stressLevel = 0;
 let tier = 'medium';
 let config = TIER_CONFIG.medium;
 let width = 1;
@@ -40,6 +41,9 @@ self.onmessage = async (event) => {
     syncState();
   } else if (message.type === 'set_audio_level') {
     audioLevel = Math.max(0, Math.min(1, Number(message.level) || 0));
+    ensureRunning();
+  } else if (message.type === 'set_stress_level') {
+    stressLevel = Math.max(0, Math.min(1, Number(message.level) || 0));
     ensureRunning();
   } else if (message.type === 'resize') {
     resize(message.width, message.height);
@@ -229,6 +233,12 @@ function syncState() {
       targetSpread = 1.0;
       break;
   }
+
+  if (stressLevel >= 0.9) {
+    targetColor.set('#ff3366');
+  } else if (stressLevel >= 0.75) {
+    targetColor.lerp(new THREE.Color('#ffb800'), 0.6);
+  }
   ensureRunning();
 }
 
@@ -240,11 +250,7 @@ function ensureRunning() {
 }
 
 function maybeStop() {
-  if (state === 'idle' && audioLevel === 0 && Math.abs(currentScale - targetScale) < 0.01) {
-    running = false;
-    if (frameHandle) cancelAnimationFrame(frameHandle);
-    frameHandle = null;
-  }
+  // Keep the scene subtly animated at all times so the core never looks frozen.
 }
 
 function render(now) {
@@ -267,6 +273,11 @@ function render(now) {
     ring.rotation.x += 0.003 + index * 0.0007;
     ring.rotation.y += 0.004 + index * 0.0005;
     ring.material.opacity = 0.35 + audioLevel * 0.35;
+    if (stressLevel >= 0.75) {
+      ring.material.color.set(stressLevel >= 0.9 ? '#ff3366' : '#ffb800');
+    } else {
+      ring.material.color.set('#00b4ff');
+    }
   });
 
   if (ambient) {

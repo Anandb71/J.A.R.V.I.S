@@ -5,6 +5,7 @@ export class ThreeEngine {
     this.ready = false;
     this.pendingState = 'idle';
     this.pendingAudioLevel = 0;
+    this.pendingStressLevel = 0;
     this.pendingTier = this._detectTier();
     this._tiers = ['high', 'medium', 'low'];
 
@@ -72,6 +73,11 @@ export class ThreeEngine {
     this._send({ type: 'set_audio_level', level });
   }
 
+  setStressLevel(level) {
+    this.pendingStressLevel = level;
+    this._send({ type: 'set_stress_level', level });
+  }
+
   setTier(tier) {
     this.pendingTier = tier;
     this._send({ type: 'set_tier', tier });
@@ -91,6 +97,7 @@ export class ThreeEngine {
     this.worker.postMessage({ type: 'set_tier', tier: this.pendingTier });
     this.worker.postMessage({ type: 'set_state', state: this.pendingState });
     this.worker.postMessage({ type: 'set_audio_level', level: this.pendingAudioLevel });
+    this.worker.postMessage({ type: 'set_stress_level', level: this.pendingStressLevel });
   }
 
   _detectTier() {

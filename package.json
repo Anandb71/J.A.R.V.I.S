@@ -38,15 +38,6 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
-    "electronFuses": {
-      "runAsNode": false,
-      "enableCookieEncryption": true,
-      "enableNodeOptionsEnvironmentVariable": false,
-      "enableNodeCliInspectArguments": false,
-      "enableEmbeddedAsarIntegrityValidation": true,
-      "onlyLoadAppFromAsar": true,
-      "grantFileProtocolExtraPrivileges": false
-    },
     "publish": [
       {
         "provider": "github",
@@ -57,11 +48,11 @@
   },
   "dependencies": {
     "@ricky0123/vad-web": "^0.0.18",
-    "electron": "^33.0.0",
     "electron-updater": "^6.0.0",
     "three": "^0.170.0"
   },
   "devDependencies": {
+    "electron": "^33.0.0",
     "electron-builder": "^25.0.0"
   }
 }
