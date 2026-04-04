@@ -210,10 +210,20 @@ async def websocket_endpoint(websocket: WebSocket):
                 await hub.broadcast(BroadcastMessage(event="vision:capture", payload=capture))
             elif event == "gesture:enable":
                 await app.state.gesture_tracker.start()
-                await hub.broadcast(BroadcastMessage(event="gesture:status", payload={"enabled": True}))
+                await hub.broadcast(
+                    BroadcastMessage(
+                        event="gesture:status",
+                        payload={"enabled": bool(app.state.gesture_tracker.is_running)},
+                    )
+                )
             elif event == "gesture:disable":
                 await app.state.gesture_tracker.stop()
-                await hub.broadcast(BroadcastMessage(event="gesture:status", payload={"enabled": False}))
+                await hub.broadcast(
+                    BroadcastMessage(
+                        event="gesture:status",
+                        payload={"enabled": bool(app.state.gesture_tracker.is_running)},
+                    )
+                )
             elif event == "gesture:status":
                 await hub.broadcast(
                     BroadcastMessage(

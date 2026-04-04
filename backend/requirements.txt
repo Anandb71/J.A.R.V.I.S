@@ -17,3 +17,4 @@ faster-whisper>=1.1.0
 pvporcupine>=3.0.0
 pvrecorder>=1.2.0
 mediapipe>=0.10.14
+opencv-python-headless>=4.10.0

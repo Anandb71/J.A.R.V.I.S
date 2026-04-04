@@ -7,11 +7,16 @@ block_cipher = None
 hiddenimports = [
     *collect_submodules("uvicorn"),
     *collect_submodules("chromadb"),
+    *collect_submodules("sentence_transformers"),
     "onnxruntime",
+    "tokenizers",
+    "psutil",
+    "structlog",
 ]
 
 datas = [
     *collect_data_files("chromadb"),
+    *collect_data_files("sentence_transformers"),
 ]
 
 a = Analysis(

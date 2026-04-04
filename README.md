@@ -126,17 +126,19 @@ Master plan:
 
 ## Status
 
-Current phase: **Phase 10 hardening in progress**.
+Current phase: **Phase 11 post-audit fixes landed**.
 
 Implemented in repo now:
 - Electron shell with IPC sender validation + permission/CSP security hardening
 - FastAPI backend with local-first AI routing, tool safety policy, memory, and streaming chat
 - Full-duplex voice path (VAD + STT + streaming TTS)
 - Vision inspection/capture with privacy filtering and sensitive-window redaction
-- Structured tool audit logging and gesture subsystem scaffolding (feature-gated)
+- Structured tool audit logging with risk-tier execution policy
+- Gesture pipeline with MediaPipe LIVE_STREAM tracker integration (feature-gated)
+- Runtime observability helpers: latency stats, crash hooks, and loop watchdog
 
 Next milestone focus:
-- complete gesture runtime integration and tune gesture confidence thresholds,
+- tune gesture confidence/UX behavior with real-device testing,
 - validate packaging pipeline (`PyInstaller` + `electron-builder`) end-to-end,
 - expand automated tests and soak-run observability checks.
 

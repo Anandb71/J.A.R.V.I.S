@@ -55,3 +55,8 @@ def get_latency_stats(stage: str) -> dict[str, float]:
         "p95": round(p95, 2),
         "p99": round(p99, 2),
     }
+
+
+def get_all_latency_stats() -> dict[str, dict[str, float]]:
+    """Return latency stats for all tracked stages."""
+    return {stage: get_latency_stats(stage) for stage in sorted(_windows.keys())}
