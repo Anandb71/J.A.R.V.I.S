@@ -1,0 +1,66 @@
+:root {
+  --bg: rgba(10, 14, 26, 0.48);
+  --panel: rgba(10, 22, 40, 0.66);
+  --line: rgba(0, 180, 255, 0.45);
+  --cyan: #00b4ff;
+  --orange: #ff6b35;
+  --purple: #b44dff;
+  --text: #e0f0ff;
+  --muted: #8db5d7;
+  --ok: #00ff88;
+  --warn: #ffb800;
+  --danger: #ff3366;
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family: Inter, Segoe UI, Arial, sans-serif;
+  color: var(--text);
+  background: transparent;
+}
+
+.hud-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 24px rgba(0, 180, 255, 0.18);
+}
+
+.status-pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.status-pill.online {
+  color: var(--ok);
+  border-color: rgba(0, 255, 136, 0.4);
+}
+
+.status-pill.warn {
+  color: var(--warn);
+  border-color: rgba(255, 184, 0, 0.4);
+}
+
+.hud-btn {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(0, 180, 255, 0.1);
+  color: var(--text);
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.hud-btn:hover {
+  background: rgba(0, 180, 255, 0.2);
+}

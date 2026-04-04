@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JARVIS HUD</title>
+    <link rel="stylesheet" href="./css/design-system.css" />
+    <link rel="stylesheet" href="./css/hud.css" />
+  </head>
+  <body>
+    <div id="hud-root" class="hud-root">
+      <header class="hud-panel top-bar">
+        <div class="status-pill online">JARVIS ONLINE</div>
+        <div id="clock" class="clock">--:--:--</div>
+        <div id="backend-status" class="status-pill warn">Backend: starting…</div>
+      </header>
+
+      <aside class="hud-panel left-panel">
+        <h2>System</h2>
+        <ul>
+          <li>CPU: --%</li>
+          <li>RAM: --%</li>
+          <li>GPU: --%</li>
+          <li>NET: -- kb/s</li>
+        </ul>
+      </aside>
+
+      <main class="hud-panel center-panel">
+        <div class="orb-wrap">
+          <div class="orb"></div>
+          <p class="orb-label">JARVIS Core</p>
+        </div>
+      </main>
+
+      <aside class="hud-panel right-panel">
+        <h2>Comms</h2>
+        <div id="ws-log" class="log-box">Awaiting websocket events…</div>
+      </aside>
+
+      <footer class="hud-panel bottom-bar">
+        <button id="btn-toggle-clickthrough" class="hud-btn">Toggle Click-through</button>
+        <button id="btn-toggle-hud" class="hud-btn">Toggle HUD Visibility</button>
+      </footer>
+    </div>
+
+    <script src="./js/websocket.js"></script>
+    <script src="./js/app.js"></script>
+  </body>
+</html>
