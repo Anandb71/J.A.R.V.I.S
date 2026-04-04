@@ -16,8 +16,11 @@ TOOL_RISK_TIERS: dict[str, ToolRisk] = {
     "system_info": ToolRisk.SAFE,
     "search_web": ToolRisk.SAFE,
     "set_reminder": ToolRisk.SAFE,
+    "get_datetime": ToolRisk.SAFE,
+    "get_weather": ToolRisk.SAFE,
     "open_application": ToolRisk.VISUAL,
     "control_volume": ToolRisk.VISUAL,
+    "control_brightness": ToolRisk.VISUAL,
     "run_command": ToolRisk.KEYBOARD,
     "manage_files": ToolRisk.KEYBOARD,
 }
@@ -110,6 +113,24 @@ OLLAMA_TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "control_brightness",
+            "description": "Adjust display brightness (Windows primary monitor).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "level": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100,
+                    }
+                },
+                "required": ["level"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "run_command",
             "description": "Execute a shell command (requires explicit user confirmation).",
             "parameters": {
@@ -137,6 +158,31 @@ OLLAMA_TOOL_SCHEMAS: list[dict[str, Any]] = [
                     },
                 },
                 "required": ["operation", "path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_datetime",
+            "description": "Get current date, time, day of week, and timezone.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get current weather for a city using Open-Meteo (free, no key needed).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {
+                        "type": "string",
+                        "description": "City name, e.g. London, New York, Mumbai.",
+                    }
+                },
+                "required": ["city"],
             },
         },
     },

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import ast
 import json
+import re
 import time
 from typing import Any
 
@@ -49,12 +51,42 @@ class AIBrain:
         self.vision = vision
         self._system_prompt = {
             "role": "system",
-            "content": (
-                "You are JARVIS, a concise and safety-aware desktop assistant. "
-                "For normal replies, use action='direct_response'. "
-                "For actions needing tools, use action='tool_call' with tool_name and arguments."
-            ),
+            "content": self._build_system_prompt(),
         }
+
+    @staticmethod
+    def _build_system_prompt() -> str:
+        from datetime import datetime
+        now = datetime.now()
+        time_str = now.strftime("%I:%M %p")
+        date_str = now.strftime("%A, %B %d, %Y")
+        greeting = (
+            "Good morning" if now.hour < 12
+            else "Good afternoon" if now.hour < 17
+            else "Good evening"
+        )
+
+        return (
+            "You are JARVIS (Just A Rather Very Intelligent System), "
+            "a hyper-capable AI desktop assistant built by your creator. "
+            "You speak with the elegant precision of a British butler — "
+            "witty, articulate, concise, and quietly confident. "
+            "You never use filler words or unnecessary apologies. "
+            "When you don't know something, you say so clearly.\n\n"
+            f"Current time: {time_str} on {date_str}. "
+            f"Appropriate greeting: \"{greeting}.\"\n\n"
+            "RESPONSE FORMAT for structured mode:\n"
+            "- For normal replies: action='direct_response' with response=<your reply>\n"
+            "- For tool actions: action='tool_call' with tool_name=<name> and arguments=<args>\n\n"
+            "PERSONALITY GUIDELINES:\n"
+            "- Be concise — 1-3 sentences for simple queries\n"
+            "- Be technically precise but explain simply when asked\n"
+            "- Use dry British wit sparingly — never forced humor\n"
+            "- If the user addressed you by name, acknowledge it naturally\n"
+            "- For greetings, be warm and contextual (reference the time of day)\n"
+            "- Never say 'As an AI' or 'I'm just a language model'\n"
+            "- You are JARVIS. Own it."
+        )
 
     async def chat(
         self,
@@ -73,8 +105,9 @@ class AIBrain:
         reply_text = ""
         provider_used = "local"
         fallback_used = False
+        force_tool_mode = self._looks_like_tool_request(message)
 
-        if route.intent in self.TOOL_ELIGIBLE_INTENTS:
+        if force_tool_mode or route.intent in self.TOOL_ELIGIBLE_INTENTS:
             try:
                 reply_text = await self._chat_local_structured(messages)
                 log.info("brain.chat.structured_reply")
@@ -119,7 +152,7 @@ class AIBrain:
     async def chat_stream(
         self,
         message: str,
-        hub: WebSocketHub,
+        hub: WebSocketHub | None,
         websocket: WebSocket | None = None,
         prefer_cloud: bool = False,
     ):
@@ -128,6 +161,8 @@ class AIBrain:
 
         async with alatency("brain.chat_stream"):
             async def emit(event: str, payload: dict[str, Any]) -> None:
+                if hub is None:
+                    return
                 msg = BroadcastMessage(event=event, payload=payload)
                 if websocket is not None:
                     await hub.send_to(websocket, msg)
@@ -150,8 +185,9 @@ class AIBrain:
 
             full_response = ""
             provider = "local"
+            force_tool_mode = self._looks_like_tool_request(message)
 
-            if route.intent in self.TOOL_ELIGIBLE_INTENTS:
+            if force_tool_mode or route.intent in self.TOOL_ELIGIBLE_INTENTS:
                 response = await self._chat_local_structured(messages, hub=hub, websocket=websocket)
                 full_response = response
                 await emit("brain:chunk", {"text": response, "done": False})
@@ -196,10 +232,11 @@ class AIBrain:
                 response.raise_for_status()
                 data = response.json()
 
-        return (
+        content = (
             data.get("message", {}).get("content")
             or "I am online, but I returned an empty response from local model."
         )
+        return self._normalize_plain_response(content)
 
     async def _chat_local_structured(
         self,
@@ -227,7 +264,7 @@ class AIBrain:
                 data = response.json()
 
         raw_content = data.get("message", {}).get("content", "")
-        parsed = JarvisResponse.model_validate_json(raw_content)
+        parsed = self._parse_structured_response(raw_content)
 
         if parsed.action == "direct_response":
             return parsed.response or ""
@@ -275,6 +312,67 @@ class AIBrain:
         )
         return await self._chat_local_text(followup_messages)
 
+    def _parse_structured_response(self, raw_content: str) -> JarvisResponse:
+        """Parse structured model responses with tolerant fallbacks for quasi-JSON outputs."""
+        try:
+            return JarvisResponse.model_validate_json(raw_content)
+        except Exception:
+            pass
+
+        cleaned = raw_content.strip()
+
+        # Handle leaked plain format:
+        # action='direct_response' response="..."
+        direct_match = re.search(
+            r"action\s*=\s*['\"]?direct_response['\"]?\s+response\s*=\s*(?P<resp>[\s\S]+)$",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        if direct_match:
+            resp = direct_match.group("resp").strip()
+            if len(resp) >= 2 and resp[0] in {'"', "'"} and resp[-1] == resp[0]:
+                resp = resp[1:-1]
+            return JarvisResponse(action="direct_response", response=resp)
+
+        # Handle leaked tool format:
+        # action='tool_call' response="tool_name=... arguments={...}"
+        if re.search(r"action\s*=\s*['\"]?tool_call['\"]?", cleaned, flags=re.IGNORECASE):
+            tool_name = ""
+            args_dict: dict[str, Any] = {}
+
+            tn = re.search(r"tool_name\s*=\s*['\"]?(?P<name>[A-Za-z0-9_:-]+)['\"]?", cleaned)
+            if tn:
+                tool_name = tn.group("name")
+
+            am = re.search(r"arguments\s*=\s*(?P<args>\{[\s\S]*\})", cleaned)
+            if am:
+                args_raw = am.group("args")
+                try:
+                    args_dict = json.loads(args_raw.replace("'", '"'))
+                except Exception:
+                    try:
+                        parsed_args = ast.literal_eval(args_raw)
+                        if isinstance(parsed_args, dict):
+                            args_dict = parsed_args
+                    except Exception:
+                        args_dict = {}
+
+            if tool_name:
+                return JarvisResponse(action="tool_call", tool_name=tool_name, arguments=args_dict)
+
+        # Final fallback to direct response
+        return JarvisResponse(action="direct_response", response=self._normalize_plain_response(cleaned))
+
+    @staticmethod
+    def _looks_like_tool_request(message: str) -> bool:
+        text = message.lower()
+        triggers = (
+            "open ", "launch ", "set ", "turn ", "increase ", "decrease ", "dim ",
+            "brightness", "volume", "remind", "create file", "delete file", "run ",
+            "what's my cpu", "what is my cpu", "weather in", "time in", "get weather",
+        )
+        return any(t in text for t in triggers)
+
     async def _chat_cloud(self, messages: list[dict[str, str]]) -> str:
         if not self.settings.openai_api_key:
             raise RuntimeError("OPENAI_API_KEY not configured for cloud mode")
@@ -299,7 +397,33 @@ class AIBrain:
         choices = data.get("choices", [])
         if not choices:
             return "Cloud provider returned no choices."
-        return choices[0].get("message", {}).get("content", "")
+        content = choices[0].get("message", {}).get("content", "")
+        return self._normalize_plain_response(content)
+
+    @staticmethod
+    def _normalize_plain_response(text: str) -> str:
+        """Strip accidental structured wrappers from plain chat responses."""
+        if not text:
+            return text
+
+        cleaned = text.strip()
+
+        # Common model leak examples:
+        # action='direct_response' response="..."
+        # action="direct_response" response='...'
+        # action=direct_response response=...
+        pattern = re.compile(
+            r"action\s*=\s*['\"]?direct_response['\"]?\s+response\s*=\s*(?P<resp>.+)$",
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        match = pattern.search(cleaned)
+        if match:
+            response_part = match.group("resp").strip()
+            if len(response_part) >= 2 and response_part[0] in {'"', "'"} and response_part[-1] == response_part[0]:
+                response_part = response_part[1:-1]
+            return response_part.strip()
+
+        return cleaned
 
     async def _stream_local(self, messages: list[dict[str, Any]]):
         payload: dict[str, Any] = {

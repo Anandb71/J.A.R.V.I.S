@@ -21,6 +21,43 @@ async def health() -> dict[str, str | bool]:
     }
 
 
+@router.get("/ready")
+async def ready(request: Request) -> dict[str, object]:
+    """Granular readiness — drives the HUD boot state machine."""
+    modules: dict[str, bool] = {}
+
+    # Brain
+    brain = getattr(request.app.state, "brain", None)
+    modules["brain"] = brain is not None
+
+    # WebSocket hub
+    hub = getattr(request.app.state, "hub", None)
+    modules["hub"] = hub is not None
+    modules["ws_connections"] = hub.connection_count if hub else 0
+
+    # Voice
+    voice = getattr(request.app.state, "voice", None)
+    modules["voice"] = voice is not None
+
+    # Vision
+    vision = getattr(request.app.state, "vision", None)
+    modules["vision"] = vision is not None
+
+    # Gesture
+    gesture = getattr(request.app.state, "gesture_tracker", None)
+    modules["gesture"] = gesture is not None and getattr(gesture, "is_running", False)
+
+    # Monitor
+    modules["monitor"] = getattr(request.app.state, "system_monitor", None) is not None
+
+    all_ready = modules.get("brain", False) and modules.get("hub", False)
+    return {
+        "ready": all_ready,
+        "modules": modules,
+        "version": settings.app_version,
+    }
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
     brain = request.app.state.brain
@@ -40,12 +77,11 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
 @router.post("/chat/stream")
 async def chat_stream(payload: ChatRequest, request: Request) -> StreamingResponse:
     brain = request.app.state.brain
-    hub = request.app.state.hub
 
     async def event_generator():
         async for chunk in brain.chat_stream(
             message=payload.message,
-            hub=hub,
+            hub=None,
             prefer_cloud=payload.prefer_cloud,
         ):
             data = {"event": "brain:chunk", "payload": {"text": chunk, "done": False}}

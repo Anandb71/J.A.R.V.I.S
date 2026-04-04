@@ -4,11 +4,13 @@ import json
 import asyncio
 import multiprocessing
 import sys
+import hashlib
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import uvicorn
 from sentence_transformers import SentenceTransformer
+import numpy as np
 
 from backend.api.routes import router as api_router
 from backend.api.websocket_hub import BroadcastMessage, WebSocketHub
@@ -35,6 +37,42 @@ except Exception:
     log = logging.getLogger(__name__)
 
 hub = WebSocketHub()
+
+
+class FallbackEmbeddingModel:
+    """Deterministic local embedding fallback when sentence-transformers cannot initialize."""
+
+    def __init__(self, dim: int = 384) -> None:
+        self.dim = dim
+
+    def _embed_one(self, text: str) -> np.ndarray:
+        vec = np.zeros(self.dim, dtype=np.float32)
+        clean = text.strip().lower() or "jarvis"
+        for i in range(self.dim):
+            digest = hashlib.sha256(f"{clean}:{i}".encode("utf-8")).digest()
+            value = int.from_bytes(digest[:2], byteorder="big", signed=False)
+            vec[i] = (value / 65535.0) * 2.0 - 1.0
+        norm = np.linalg.norm(vec)
+        if norm > 0:
+            vec = vec / norm
+        return vec
+
+    def encode(self, texts):
+        if isinstance(texts, str):
+            return self._embed_one(texts)
+        return np.asarray([self._embed_one(str(item)) for item in texts])
+
+
+def load_embedding_model():
+    try:
+        return SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+    except Exception as cached_exc:
+        log.warning("embedding.load.cached_failed", error=str(cached_exc))
+        try:
+            return SentenceTransformer("all-MiniLM-L6-v2")
+        except Exception as download_exc:
+            log.error("embedding.load.fallback", error=str(download_exc))
+            return FallbackEmbeddingModel()
 
 
 async def heartbeat_task() -> None:
@@ -81,7 +119,7 @@ async def lifespan(_app: FastAPI):
     configure_logging(dev_mode=not is_packaged, log_to_file=is_packaged)
     install_crash_hooks(app_version=settings.app_version)
     log.info("app.starting", app=settings.app_name, version=settings.app_version)
-    embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+    embedding_model = load_embedding_model()
     semantic_router = SemanticRouter(model=embedding_model, privacy_mode=settings.privacy_mode)
     rag_memory = RAGMemory(embedding_model=embedding_model)
     _app.state.vision = VisionManager.from_settings(settings)
@@ -133,6 +171,9 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             raw = await websocket.receive()
 
+            if raw.get("type") == "websocket.disconnect":
+                raise WebSocketDisconnect
+
             # Binary frame: audio data from client microphone
             if raw.get("bytes"):
                 audio_bytes = raw["bytes"]
@@ -159,7 +200,7 @@ async def websocket_endpoint(websocket: WebSocket):
             data = json.loads(text)
             event = data.get("event")
             payload = data.get("payload", {})
-            log.info("ws.event", event=event)
+            log.info("ws.event", ws_event=event)
 
             if event == "chat":
                 message = str(payload.get("message", "")).strip()
@@ -176,7 +217,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 async for _ in app.state.brain.chat_stream(message=message, hub=hub, prefer_cloud=prefer_cloud):
                     pass
 
-            elif event == "confirm_tool":
+            elif event in ("confirm_tool", "tool_confirm"):
                 request_id = str(payload.get("request_id", ""))
                 approved = bool(payload.get("approved", False))
                 resolved = app.state.brain.tool_executor.resolve_confirmation(request_id, approved)
@@ -259,4 +300,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
-    uvicorn.run("backend.main:app", host=settings.host, port=settings.port, reload=False)
+    if getattr(sys, "frozen", False):
+        uvicorn.run(app, host=settings.host, port=settings.port, reload=False)
+    else:
+        uvicorn.run("backend.main:app", host=settings.host, port=settings.port, reload=False)

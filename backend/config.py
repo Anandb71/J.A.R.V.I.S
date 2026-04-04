@@ -15,7 +15,7 @@ class Settings:
     app_version: str = os.getenv("JARVIS_APP_VERSION", "0.1.0")
 
     ai_provider: str = os.getenv("JARVIS_AI_PROVIDER", "local")
-    local_model: str = os.getenv("JARVIS_LOCAL_MODEL", "qwen2.5:3b-instruct")
+    local_model: str = os.getenv("JARVIS_LOCAL_MODEL", "llama3.2:3b")
     local_ai_url: str = os.getenv("JARVIS_LOCAL_AI_URL", "http://127.0.0.1:11434")
     cloud_model: str = os.getenv("JARVIS_CLOUD_MODEL", "gpt-4o-mini")
     cloud_api_base_url: str = os.getenv("JARVIS_CLOUD_API_BASE_URL", "https://api.openai.com/v1")
