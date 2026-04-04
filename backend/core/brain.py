@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 import httpx
+from fastapi import WebSocket
 
 from backend.api.websocket_hub import BroadcastMessage, WebSocketHub
 from backend.config import Settings
@@ -14,7 +15,10 @@ from backend.core.router import RoutingTier, SemanticRouter
 from backend.core.schemas import JarvisResponse
 from backend.core.tool_executor import ToolExecutor
 from backend.core.tools import get_ollama_tool_schemas
+from backend.logging import get_logger
 from backend.vision.manager import VisionManager
+
+log = get_logger(__name__)
 
 
 @dataclass
@@ -60,6 +64,7 @@ class AIBrain:
         """Non-streaming chat endpoint used by REST API."""
         start = time.perf_counter()
         route = await self.router.route(message=message, prefer_cloud=prefer_cloud)
+        log.info("brain.chat.route", tier=route.tier.value, intent=route.intent, confidence=round(route.confidence, 3))
         messages = await self.memory.build_context(message, self._system_prompt)
         messages = await self._attach_vision_context(messages, message)
         await self.memory.add_message("user", message)
@@ -71,22 +76,27 @@ class AIBrain:
         if route.intent in self.TOOL_ELIGIBLE_INTENTS:
             try:
                 reply_text = await self._chat_local_structured(messages)
+                log.info("brain.chat.structured_reply")
             except Exception as exc:
                 reply_text = f"Tool pipeline failed. Falling back to direct reply. Details: {exc}"
                 fallback_used = True
+                log.warning("brain.chat.structured_failed", error=str(exc))
         else:
             if route.tier == RoutingTier.CLOUD and self.settings.openai_api_key:
                 try:
                     reply_text = await self._chat_cloud(messages)
                     provider_used = "cloud"
+                    log.info("brain.chat.provider", provider=provider_used)
                 except Exception:
                     reply_text = await self._chat_local_text(messages)
                     provider_used = "local"
                     fallback_used = True
+                    log.warning("brain.chat.cloud_fallback_local")
             else:
                 try:
                     reply_text = await self._chat_local_text(messages)
                     provider_used = "local"
+                    log.info("brain.chat.provider", provider=provider_used)
                 except Exception as exc:
                     reply_text = (
                         "Local model path failed. "
@@ -94,6 +104,7 @@ class AIBrain:
                         f"Details: {exc}"
                     )
                     fallback_used = True
+                    log.error("brain.chat.local_failed", error=str(exc))
 
         await self.memory.add_message("assistant", reply_text)
 
@@ -108,38 +119,46 @@ class AIBrain:
         self,
         message: str,
         hub: WebSocketHub,
+        websocket: WebSocket | None = None,
         prefer_cloud: bool = False,
     ):
         """Streaming chat with realtime websocket events and chunk yields."""
         start = time.perf_counter()
-        await hub.broadcast(BroadcastMessage(event="brain:routing", payload={"message": message}))
+
+        async def emit(event: str, payload: dict[str, Any]) -> None:
+            msg = BroadcastMessage(event=event, payload=payload)
+            if websocket is not None:
+                await hub.send_to(websocket, msg)
+            else:
+                await hub.broadcast(msg)
+
+        await emit("brain:routing", {"message": message})
+        log.info("brain.stream.start", voice_session=websocket is not None)
 
         route = await self.router.route(message=message, prefer_cloud=prefer_cloud)
-        await hub.broadcast(
-            BroadcastMessage(
-                event="brain:routed",
-                payload={"tier": route.tier.value, "intent": route.intent, "confidence": round(route.confidence, 3)},
-            )
+        await emit(
+            "brain:routed",
+            {"tier": route.tier.value, "intent": route.intent, "confidence": round(route.confidence, 3)},
         )
 
         messages = await self.memory.build_context(message, self._system_prompt)
         messages = await self._attach_vision_context(messages, message)
         await self.memory.add_message("user", message)
-        await hub.broadcast(BroadcastMessage(event="brain:thinking", payload={}))
+        await emit("brain:thinking", {})
 
         full_response = ""
         provider = "local"
 
         if route.intent in self.TOOL_ELIGIBLE_INTENTS:
-            response = await self._chat_local_structured(messages, hub=hub)
+            response = await self._chat_local_structured(messages, hub=hub, websocket=websocket)
             full_response = response
-            await hub.broadcast(BroadcastMessage(event="brain:chunk", payload={"text": response, "done": False}))
+            await emit("brain:chunk", {"text": response, "done": False})
             yield response
         elif route.tier == RoutingTier.CLOUD and self.settings.openai_api_key:
             provider = "cloud"
             response = await self._chat_cloud(messages)
             full_response = response
-            await hub.broadcast(BroadcastMessage(event="brain:chunk", payload={"text": response, "done": False}))
+            await emit("brain:chunk", {"text": response, "done": False})
             yield response
         else:
             async for chunk in self._stream_local(messages):
@@ -147,19 +166,15 @@ class AIBrain:
                     text = chunk["data"]
                     if text:
                         full_response += text
-                        await hub.broadcast(BroadcastMessage(event="brain:chunk", payload={"text": text, "done": False}))
+                        await emit("brain:chunk", {"text": text, "done": False})
                         yield text
                 elif chunk["type"] == "tool_call":
-                    await hub.broadcast(BroadcastMessage(event="brain:tool_call", payload={"tools": chunk["data"]}))
+                    await emit("brain:tool_call", {"tools": chunk["data"]})
 
         latency_ms = self._latency_ms(start)
         await self.memory.add_message("assistant", full_response)
-        await hub.broadcast(
-            BroadcastMessage(
-                event="brain:done",
-                payload={"full_text": full_response, "latency_ms": latency_ms, "provider": provider},
-            )
-        )
+        await emit("brain:done", {"full_text": full_response, "latency_ms": latency_ms, "provider": provider})
+        log.info("brain.stream.done", provider=provider, latency_ms=latency_ms)
 
     async def _chat_local_text(self, messages: list[dict[str, Any]]) -> str:
         payload: dict[str, Any] = {
@@ -183,7 +198,12 @@ class AIBrain:
             or "I am online, but I returned an empty response from local model."
         )
 
-    async def _chat_local_structured(self, messages: list[dict[str, Any]], hub: WebSocketHub | None = None) -> str:
+    async def _chat_local_structured(
+        self,
+        messages: list[dict[str, Any]],
+        hub: WebSocketHub | None = None,
+        websocket: WebSocket | None = None,
+    ) -> str:
         payload: dict[str, Any] = {
             "model": self.settings.local_model,
             "messages": messages,
@@ -211,22 +231,26 @@ class AIBrain:
         tool_name = parsed.tool_name or ""
         arguments = parsed.arguments or {}
         if hub is not None:
-            await hub.broadcast(
-                BroadcastMessage(
-                    event="brain:tool_call",
-                    payload={"tool_name": tool_name, "arguments": arguments, "reasoning": parsed.reasoning},
-                )
+            message = BroadcastMessage(
+                event="brain:tool_call",
+                payload={"tool_name": tool_name, "arguments": arguments, "reasoning": parsed.reasoning},
             )
+            if websocket is not None:
+                await hub.send_to(websocket, message)
+            else:
+                await hub.broadcast(message)
 
         result = await self.tool_executor.execute(tool_name, arguments, hub=hub)
 
         if hub is not None:
-            await hub.broadcast(
-                BroadcastMessage(
-                    event="brain:tool_result",
-                    payload={"tool_name": tool_name, "result": result.output, "status": result.status},
-                )
+            message = BroadcastMessage(
+                event="brain:tool_result",
+                payload={"tool_name": tool_name, "result": result.output, "status": result.status},
             )
+            if websocket is not None:
+                await hub.send_to(websocket, message)
+            else:
+                await hub.broadcast(message)
 
         if result.status in {"denied", "error", "requires_confirmation"}:
             return f"Tool '{tool_name}' could not run: {result.output}"

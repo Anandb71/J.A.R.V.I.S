@@ -12,6 +12,7 @@
     "typecheck": "echo \"Typecheck not configured yet\""
   },
   "dependencies": {
+    "@ricky0123/vad-web": "^0.0.18",
     "electron": "^33.0.0",
     "three": "^0.170.0"
   }

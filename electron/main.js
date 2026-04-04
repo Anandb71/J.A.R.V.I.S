@@ -1,12 +1,22 @@
-const { app, BrowserWindow, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, session } = require('electron');
 const path = require('node:path');
 const { PythonBridge } = require('./python-bridge');
+const { CredentialStore } = require('./credential-store');
 
 let mainWindow;
 let hudVisible = true;
 let clickThrough = true;
 
 const pythonBridge = new PythonBridge();
+let credentialStore = null;
+
+function isTrustedSender(event) {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  const senderFrame = event?.senderFrame;
+  if (!senderFrame) return false;
+  const frameUrl = String(senderFrame.url || '');
+  return frameUrl.startsWith('file://') && senderFrame === mainWindow.webContents.mainFrame;
+}
 
 function broadcastBackendStatus() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -35,6 +45,12 @@ function createWindow() {
   mainWindow.loadFile(path.resolve(__dirname, '..', 'src', 'index.html'));
   mainWindow.setIgnoreMouseEvents(clickThrough, { forward: true });
 
+  // Security: block navigation away from app and disallow popups.
+  mainWindow.webContents.on('will-navigate', (event) => {
+    event.preventDefault();
+  });
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -59,25 +75,79 @@ function registerShortcuts() {
 }
 
 function setupIpc() {
-  ipcMain.handle('jarvis:toggle-clickthrough', () => {
+  ipcMain.handle('jarvis:toggle-clickthrough', (event) => {
+    if (!isTrustedSender(event)) return { clickThrough };
     clickThrough = !clickThrough;
     mainWindow?.setIgnoreMouseEvents(clickThrough, { forward: true });
     return { clickThrough };
   });
 
-  ipcMain.handle('jarvis:toggle-hud', () => {
+  ipcMain.handle('jarvis:toggle-hud', (event) => {
+    if (!isTrustedSender(event)) return { hudVisible };
     hudVisible = !hudVisible;
     if (hudVisible) mainWindow?.show();
     else mainWindow?.hide();
     return { hudVisible };
   });
 
-  ipcMain.handle('jarvis:get-backend-status', () => ({
+  ipcMain.handle('jarvis:get-backend-status', (event) => {
+    if (!isTrustedSender(event)) return { running: false };
+    return {
     running: Boolean(pythonBridge.process),
-  }));
+    };
+  });
+
+  ipcMain.handle('jarvis:set-credential', (event, key, value) => {
+    if (!isTrustedSender(event)) return false;
+    if (!credentialStore || !key) return false;
+    return credentialStore.save(String(key), String(value ?? ''));
+  });
+
+  ipcMain.handle('jarvis:get-credential', (event, key) => {
+    if (!isTrustedSender(event)) return null;
+    if (!credentialStore || !key) return null;
+    return credentialStore.get(String(key));
+  });
+
+  ipcMain.handle('jarvis:delete-credential', (event, key) => {
+    if (!isTrustedSender(event)) return false;
+    if (!credentialStore || !key) return false;
+    return credentialStore.delete(String(key));
+  });
 }
 
 app.whenReady().then(() => {
+  credentialStore = new CredentialStore(app.getPath('userData'));
+
+  // Security: explicitly control permission requests.
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
+    const requestingUrl = String(details?.requestingUrl || '');
+    const isLocalApp = requestingUrl.startsWith('file://');
+    const allowedPermissions = new Set(['microphone']);
+    callback(isLocalApp && allowedPermissions.has(permission));
+  });
+
+  // Security: enforce CSP at runtime for all responses/subresources.
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          [
+            "default-src 'self'",
+            "script-src 'self'",
+            "worker-src 'self' blob:",
+            "style-src 'self' 'unsafe-inline'",
+            "font-src 'self' data:",
+            "connect-src 'self' ws://127.0.0.1:8765 http://127.0.0.1:8765 http://127.0.0.1:11434",
+            "img-src 'self' data: blob:",
+            "media-src 'self' blob:",
+          ].join('; '),
+        ],
+      },
+    });
+  });
+
   setupIpc();
   createWindow();
   registerShortcuts();

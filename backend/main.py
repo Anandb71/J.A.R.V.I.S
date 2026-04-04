@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import asyncio
 from contextlib import asynccontextmanager, suppress
 
@@ -15,8 +16,18 @@ from backend.core.memory import RAGMemory
 from backend.core.router import SemanticRouter
 from backend.logging import configure_logging
 from backend.system.monitor import SystemMonitor
+from backend.voice.duplex_pipeline import DuplexVoicePipeline
 from backend.voice.audio_manager import VoiceManager
 from backend.vision.manager import VisionManager
+
+try:
+    import structlog  # type: ignore
+
+    log = structlog.get_logger(__name__)
+except Exception:
+    import logging
+
+    log = logging.getLogger(__name__)
 
 hub = WebSocketHub()
 
@@ -38,6 +49,7 @@ async def heartbeat_task() -> None:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     configure_logging(dev_mode=True)
+    log.info("app.starting", app=settings.app_name, version=settings.app_version)
     embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
     semantic_router = SemanticRouter(model=embedding_model, privacy_mode=settings.privacy_mode)
     rag_memory = RAGMemory(embedding_model=embedding_model)
@@ -46,11 +58,13 @@ async def lifespan(_app: FastAPI):
     _app.state.voice = VoiceManager.from_settings(brain=_app.state.brain, hub=hub, settings=settings)
     _app.state.system_monitor = SystemMonitor(hub=hub, interval=settings.system_metrics_interval)
     _app.state.hub = hub
+    _app.state.duplex_pipelines = {}  # Per-client voice pipelines (created in Step 3)
     task = asyncio.create_task(heartbeat_task())
     metrics_task = asyncio.create_task(_app.state.system_monitor.run())
     try:
         yield
     finally:
+        log.info("app.shutting_down")
         task.cancel()
         metrics_task.cancel()
         with suppress(asyncio.CancelledError):
@@ -66,12 +80,35 @@ app.include_router(api_router)
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await hub.connect(websocket)
+    log.info("ws.connected", connection_count=hub.connection_count)
     await hub.broadcast(BroadcastMessage(event="status", payload={"message": "client_connected"}))
     try:
         while True:
-            data = await websocket.receive_json()
+            raw = await websocket.receive()
+
+            # Binary frame: audio data from client microphone
+            if raw.get("bytes"):
+                if hasattr(app.state, "duplex_pipelines"):
+                    pipeline = app.state.duplex_pipelines.get(id(websocket))
+                    if not pipeline:
+                        pipeline = DuplexVoicePipeline(
+                            brain=app.state.brain,
+                            hub=hub,
+                            websocket=websocket,
+                        )
+                        app.state.duplex_pipelines[id(websocket)] = pipeline
+                    await pipeline.handle_audio_data(raw["bytes"])
+                continue
+
+            # Text frame: JSON event
+            text = raw.get("text", "")
+            if not text:
+                continue
+
+            data = json.loads(text)
             event = data.get("event")
             payload = data.get("payload", {})
+            log.info("ws.event", event=event)
 
             if event == "chat":
                 message = str(payload.get("message", "")).strip()
@@ -107,6 +144,16 @@ async def websocket_endpoint(websocket: WebSocket):
                 keyword = str(payload.get("keyword", "hey jarvis"))
                 confidence = float(payload.get("confidence", 1.0))
                 await app.state.voice.simulate_wake_word(keyword=keyword, confidence=confidence)
+            elif event == "voice:speech_end":
+                if hasattr(app.state, 'duplex_pipelines'):
+                    pipeline = app.state.duplex_pipelines.get(id(websocket))
+                    if pipeline:
+                        await pipeline.handle_speech_end()
+            elif event == "voice:interrupt":
+                if hasattr(app.state, 'duplex_pipelines'):
+                    pipeline = app.state.duplex_pipelines.get(id(websocket))
+                    if pipeline:
+                        await pipeline.handle_interrupt()
             elif event == "vision:inspect":
                 max_depth = int(payload.get("max_depth", 3))
                 max_nodes = int(payload.get("max_nodes", 64))
@@ -130,6 +177,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 await hub.broadcast(BroadcastMessage(event="echo", payload={"received": data}))
     except WebSocketDisconnect:
         await hub.disconnect(websocket)
+        if hasattr(app.state, "duplex_pipelines"):
+            app.state.duplex_pipelines.pop(id(websocket), None)
+        log.info("ws.disconnected", connection_count=hub.connection_count)
         await hub.broadcast(BroadcastMessage(event="status", payload={"message": "client_disconnected"}))
 
 

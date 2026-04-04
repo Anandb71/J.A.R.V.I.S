@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from pathlib import Path
 import platform
 import subprocess
 import uuid
 from typing import Any
 
 from backend.api.websocket_hub import BroadcastMessage, WebSocketHub
+from backend.logging import get_logger
 from backend.core.tools import evaluate_tool_request
+
+WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+log = get_logger(__name__)
 
 
 @dataclass
@@ -37,6 +42,12 @@ class ToolExecutor:
     ) -> ToolExecutionResult:
         args = arguments or {}
         decision = evaluate_tool_request(tool_name, args)
+        log.info(
+            "tools.execute.request",
+            tool_name=tool_name,
+            allowed=decision.allowed,
+            requires_confirmation=decision.requires_confirmation,
+        )
 
         if not decision.allowed and decision.requires_confirmation:
             request_id = uuid.uuid4().hex[:10]
@@ -69,10 +80,12 @@ class ToolExecutor:
                 approved = await asyncio.wait_for(future, timeout=45.0)
             except asyncio.TimeoutError:
                 approved = False
+                log.warning("tools.confirmation.timeout", tool_name=tool_name)
             finally:
                 self._pending_confirmations.pop(request_id, None)
 
             if not approved:
+                log.info("tools.confirmation.denied", tool_name=tool_name)
                 return ToolExecutionResult(
                     status="denied",
                     tool_name=tool_name,
@@ -111,13 +124,16 @@ class ToolExecutor:
         }.get(tool_name)
 
         if handler is None:
+            log.error("tools.dispatch.missing_handler", tool_name=tool_name)
             return ToolExecutionResult(
                 status="error",
                 tool_name=tool_name,
                 output={"error": "No handler registered for tool."},
             )
 
-        return await handler(args)
+        result = await handler(args)
+        log.info("tools.dispatch.result", tool_name=tool_name, status=result.status)
+        return result
 
     async def _system_info(self, _args: dict[str, Any]) -> ToolExecutionResult:
         info: dict[str, Any] = {
@@ -210,7 +226,15 @@ class ToolExecutor:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await proc.communicate()
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30.0)
+        except asyncio.TimeoutError:
+            proc.kill()
+            return ToolExecutionResult(
+                status="error",
+                tool_name="run_command",
+                output={"error": "Command timed out after 30 seconds"},
+            )
         return ToolExecutionResult(
             status="ok" if proc.returncode == 0 else "error",
             tool_name="run_command",
@@ -222,8 +246,97 @@ class ToolExecutor:
         )
 
     async def _manage_files(self, args: dict[str, Any]) -> ToolExecutionResult:
-        return ToolExecutionResult(
-            status="error",
-            tool_name="manage_files",
-            output={"error": "manage_files handler not yet implemented"},
-        )
+        action = str(args.get("operation", args.get("action", ""))).strip().lower()
+        path_value = str(args.get("path", "")).strip()
+        content = str(args.get("target", args.get("content", "")))
+
+        if not action:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="manage_files",
+                output={"error": "Missing operation"},
+            )
+
+        if action in {"list", "read", "write", "delete", "mkdir"} and not path_value:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="manage_files",
+                output={"error": "Missing path"},
+            )
+
+        def _resolve_safe_path(value: str) -> Path:
+            candidate = Path(value)
+            if not candidate.is_absolute():
+                candidate = WORKSPACE_ROOT / candidate
+            resolved = candidate.resolve()
+            if WORKSPACE_ROOT not in resolved.parents and resolved != WORKSPACE_ROOT:
+                raise ValueError("Path is outside workspace")
+            return resolved
+
+        try:
+            if action == "list":
+                target = _resolve_safe_path(path_value)
+                if not target.exists() or not target.is_dir():
+                    raise ValueError("Path is not a directory")
+                items = [p.name + ("/" if p.is_dir() else "") for p in sorted(target.iterdir())]
+                return ToolExecutionResult(
+                    status="ok",
+                    tool_name="manage_files",
+                    output={"action": "list", "path": str(target), "items": items},
+                )
+
+            if action == "read":
+                target = _resolve_safe_path(path_value)
+                if not target.exists() or not target.is_file():
+                    raise ValueError("Path is not a file")
+                data = target.read_text(encoding="utf-8", errors="ignore")
+                return ToolExecutionResult(
+                    status="ok",
+                    tool_name="manage_files",
+                    output={"action": "read", "path": str(target), "content": data[:8000]},
+                )
+
+            if action == "write":
+                target = _resolve_safe_path(path_value)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(content, encoding="utf-8")
+                return ToolExecutionResult(
+                    status="ok",
+                    tool_name="manage_files",
+                    output={"action": "write", "path": str(target), "bytes": len(content.encode("utf-8"))},
+                )
+
+            if action == "delete":
+                target = _resolve_safe_path(path_value)
+                if target.is_dir():
+                    import shutil
+
+                    shutil.rmtree(target)
+                elif target.exists():
+                    target.unlink()
+                return ToolExecutionResult(
+                    status="ok",
+                    tool_name="manage_files",
+                    output={"action": "delete", "path": str(target)},
+                )
+
+            if action == "mkdir":
+                target = _resolve_safe_path(path_value)
+                target.mkdir(parents=True, exist_ok=True)
+                return ToolExecutionResult(
+                    status="ok",
+                    tool_name="manage_files",
+                    output={"action": "mkdir", "path": str(target)},
+                )
+
+            return ToolExecutionResult(
+                status="error",
+                tool_name="manage_files",
+                output={"error": f"Unsupported action: {action}"},
+            )
+        except Exception as exc:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="manage_files",
+                output={"error": str(exc)},
+            )
