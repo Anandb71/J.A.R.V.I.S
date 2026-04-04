@@ -1,0 +1,1525 @@
+{
+  "summary": {
+    "total": 125,
+    "unique_prompts": 125,
+    "ok": 125,
+    "failed": 0,
+    "leaks": 9,
+    "errorish_replies": 1,
+    "toolish_total": 102,
+    "toolish_ok": 102,
+    "latency_avg_ms": 1364.42,
+    "latency_p95_ms": 2255,
+    "timestamp": "2026-04-05T01:45:43"
+  },
+  "samples": {
+    "leak_examples": [
+      {
+        "i": 67,
+        "prompt": "what day and date is today",
+        "ok": true,
+        "latency_ms": 1031,
+        "reply": "action='data_query' tool_name='calendar' arguments='{\"date\": \"today\"}'",
+        "leak": true,
+        "toolish": false,
+        "errorish": false
+      },
+      {
+        "i": 69,
+        "prompt": "what is your status",
+        "ok": true,
+        "latency_ms": 759,
+        "reply": "action='system_status'",
+        "leak": true,
+        "toolish": false,
+        "errorish": false
+      },
+      {
+        "i": 70,
+        "prompt": "give me one short productivity tip",
+        "ok": true,
+        "latency_ms": 1464,
+        "reply": "action='productivity_tip' tool_name='focus_boost' arguments='{\"tip\": \"Use the Pomodoro Technique: work for 25 minutes, then take a 5-minute break.\"}'",
+        "leak": true,
+        "toolish": false,
+        "errorish": false
+      },
+      {
+        "i": 72,
+        "prompt": "give me a short joke clean only",
+        "ok": true,
+        "latency_ms": 1446,
+        "reply": "action='joke' tool_name='humor_bot' arguments='{\"type\": \"one-liner\", \"text\": \"Why did the coffee file a police report? It got mugged!\"}'",
+        "leak": true,
+        "toolish": false,
+        "errorish": false
+      },
+      {
+        "i": 74,
+        "prompt": "how do you handle tool calls internally in short",
+        "ok": true,
+        "latency_ms": 1662,
+        "reply": "action='system_status' I process tool calls by parsing the 'tool_call' action, extracting the relevant information (e.g., tool_name and arguments), and routing it to the corresponding module within my system architecture for execution or further processing.",
+        "leak": true,
+        "toolish": false,
+        "errorish": false
+      },
+      {
+        "i": 75,
+        "prompt": "give me a brief safety note for automation",
+        "ok": true,
+        "latency_ms": 1453,
+        "reply": "action='safety_note' I remind you that automation can be hazardous if not designed with caution; always review and test scripts thoroughly before executing them, especially when interacting with physical systems or critical infrastructure.",
+        "leak": true,
+        "toolish": false,
+        "errorish": false
+      },
+      {
+        "i": 77,
+        "prompt": "briefly compare local model and cloud model",
+        "ok": true,
+        "latency_ms": 3787,
+        "reply": "action='model_comparison' Local models are self-contained, offline versions of my capabilities, while cloud models utilize remote servers to access scalable, up-to-date information; the choice between them depends on connectivity needs and system constraints.",
+        "leak": true,
+        "toolish": false,
+        "errorish": false
+      },
+      {
+        "i": 79,
+        "prompt": "one-line tip for writing clean typescript",
+        "ok": true,
+        "latency_ms": 1293,
+        "reply": "action='typescript_tip' Use interfaces or type aliases to define data structures and function signatures, ensuring explicitness and maintainability in your TypeScript codebase.",
+        "leak": true,
+        "toolish": false,
+        "errorish": false
+      },
+      {
+        "i": 80,
+        "prompt": "one-line tip for robust python exception handling",
+        "ok": true,
+        "latency_ms": 1501,
+        "reply": "action='python_exception_handling' Utilize Python's built-in `try-except` block with specific exception types and logging mechanisms to catch and log exceptions in a structured manner, rather than relying on bare `except` clauses.",
+        "leak": true,
+        "toolish": false,
+        "errorish": false
+      }
+    ],
+    "error_examples": [
+      {
+        "i": 76,
+        "prompt": "in one line explain why retries matter",
+        "ok": true,
+        "latency_ms": 1165,
+        "reply": "Retries ensure system reliability by allowing for the correction of transient errors, preventing data loss and ensuring continuity in automated processes.",
+        "leak": false,
+        "toolish": false,
+        "errorish": true
+      }
+    ],
+    "tool_examples": [
+      {
+        "i": 1,
+        "prompt": "give me current cpu usage with one line summary",
+        "ok": true,
+        "latency_ms": 254,
+        "reply": "CPU 85.6%, Memory 91.6%.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 2,
+        "prompt": "what is my current memory usage percentage",
+        "ok": true,
+        "latency_ms": 259,
+        "reply": "CPU 100.0%, Memory 91.7%.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 4,
+        "prompt": "check cpu and ram right now",
+        "ok": true,
+        "latency_ms": 235,
+        "reply": "CPU 100.0%, Memory 92.4%.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 7,
+        "prompt": "memory pressure now tell me",
+        "ok": true,
+        "latency_ms": 1013,
+        "reply": "MemoryPressure",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 8,
+        "prompt": "disk usage snapshot now",
+        "ok": true,
+        "latency_ms": 208,
+        "reply": "CPU 100.0%, Memory 91.3%.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 11,
+        "prompt": "cpu usage now and be brief",
+        "ok": true,
+        "latency_ms": 212,
+        "reply": "CPU 100.0%, Memory 92.2%.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 12,
+        "prompt": "memory usage now and be brief",
+        "ok": true,
+        "latency_ms": 220,
+        "reply": "CPU 100.0%, Memory 92.2%.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 16,
+        "prompt": "weather in tokyo",
+        "ok": true,
+        "latency_ms": 1935,
+        "reply": "Current weather in Tokyo: 17.3°C, feels like 18.7°C, Mainly clear.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 17,
+        "prompt": "weather in delhi",
+        "ok": true,
+        "latency_ms": 1764,
+        "reply": "Current weather in Delhi: 18.5°C, feels like 20.0°C, Slight rain showers.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 18,
+        "prompt": "weather in mumbai",
+        "ok": true,
+        "latency_ms": 2138,
+        "reply": "Current weather in Mumbai: 27.4°C, feels like 32.2°C, Partly cloudy.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 19,
+        "prompt": "weather in london",
+        "ok": true,
+        "latency_ms": 2048,
+        "reply": "Current weather in London: 12.9°C, feels like 7.8°C, Mainly clear.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 20,
+        "prompt": "weather in paris",
+        "ok": true,
+        "latency_ms": 1915,
+        "reply": "Current weather in Paris: 16.1°C, feels like 14.1°C, Partly cloudy.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 21,
+        "prompt": "weather in berlin",
+        "ok": true,
+        "latency_ms": 1972,
+        "reply": "Current weather in Berlin: 11.3°C, feels like 8.5°C, Overcast.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 22,
+        "prompt": "weather in new york",
+        "ok": true,
+        "latency_ms": 2032,
+        "reply": "Current weather in New York: 17.6°C, feels like 12.8°C, Clear sky.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      },
+      {
+        "i": 23,
+        "prompt": "weather in toronto",
+        "ok": true,
+        "latency_ms": 2064,
+        "reply": "Current weather in Toronto: 4.6°C, feels like -0.6°C, Overcast.",
+        "leak": false,
+        "toolish": true,
+        "errorish": false
+      }
+    ]
+  },
+  "results": [
+    {
+      "i": 1,
+      "prompt": "give me current cpu usage with one line summary",
+      "ok": true,
+      "latency_ms": 254,
+      "reply": "CPU 85.6%, Memory 91.6%.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 2,
+      "prompt": "what is my current memory usage percentage",
+      "ok": true,
+      "latency_ms": 259,
+      "reply": "CPU 100.0%, Memory 91.7%.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 3,
+      "prompt": "show current system info in short form",
+      "ok": true,
+      "latency_ms": 221,
+      "reply": "CPU 100.0%, Memory 91.9%.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 4,
+      "prompt": "check cpu and ram right now",
+      "ok": true,
+      "latency_ms": 235,
+      "reply": "CPU 100.0%, Memory 92.4%.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 5,
+      "prompt": "quick status of machine health",
+      "ok": true,
+      "latency_ms": 940,
+      "reply": "I am online and ready.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 6,
+      "prompt": "what is my processor load now",
+      "ok": true,
+      "latency_ms": 3573,
+      "reply": "I can help with tool actions—tell me exactly what you'd like me to do.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 7,
+      "prompt": "memory pressure now tell me",
+      "ok": true,
+      "latency_ms": 1013,
+      "reply": "MemoryPressure",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 8,
+      "prompt": "disk usage snapshot now",
+      "ok": true,
+      "latency_ms": 208,
+      "reply": "CPU 100.0%, Memory 91.3%.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 9,
+      "prompt": "how loaded is this machine currently",
+      "ok": true,
+      "latency_ms": 3166,
+      "reply": "I can help with tool actions—tell me exactly what you'd like me to do.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 10,
+      "prompt": "system status concise please",
+      "ok": true,
+      "latency_ms": 83,
+      "reply": "I am online and ready.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 11,
+      "prompt": "cpu usage now and be brief",
+      "ok": true,
+      "latency_ms": 212,
+      "reply": "CPU 100.0%, Memory 92.2%.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 12,
+      "prompt": "memory usage now and be brief",
+      "ok": true,
+      "latency_ms": 220,
+      "reply": "CPU 100.0%, Memory 92.2%.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 13,
+      "prompt": "give me a one line system summary",
+      "ok": true,
+      "latency_ms": 956,
+      "reply": "I can help with tool actions—tell me exactly what you'd like me to do.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 14,
+      "prompt": "current machine utilization status",
+      "ok": true,
+      "latency_ms": 100,
+      "reply": "I am online and ready.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 15,
+      "prompt": "check if system is under heavy load",
+      "ok": true,
+      "latency_ms": 3258,
+      "reply": "I can help with tool actions—tell me exactly what you'd like me to do.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 16,
+      "prompt": "weather in tokyo",
+      "ok": true,
+      "latency_ms": 1935,
+      "reply": "Current weather in Tokyo: 17.3°C, feels like 18.7°C, Mainly clear.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 17,
+      "prompt": "weather in delhi",
+      "ok": true,
+      "latency_ms": 1764,
+      "reply": "Current weather in Delhi: 18.5°C, feels like 20.0°C, Slight rain showers.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 18,
+      "prompt": "weather in mumbai",
+      "ok": true,
+      "latency_ms": 2138,
+      "reply": "Current weather in Mumbai: 27.4°C, feels like 32.2°C, Partly cloudy.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 19,
+      "prompt": "weather in london",
+      "ok": true,
+      "latency_ms": 2048,
+      "reply": "Current weather in London: 12.9°C, feels like 7.8°C, Mainly clear.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 20,
+      "prompt": "weather in paris",
+      "ok": true,
+      "latency_ms": 1915,
+      "reply": "Current weather in Paris: 16.1°C, feels like 14.1°C, Partly cloudy.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 21,
+      "prompt": "weather in berlin",
+      "ok": true,
+      "latency_ms": 1972,
+      "reply": "Current weather in Berlin: 11.3°C, feels like 8.5°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 22,
+      "prompt": "weather in new york",
+      "ok": true,
+      "latency_ms": 2032,
+      "reply": "Current weather in New York: 17.6°C, feels like 12.8°C, Clear sky.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 23,
+      "prompt": "weather in toronto",
+      "ok": true,
+      "latency_ms": 2064,
+      "reply": "Current weather in Toronto: 4.6°C, feels like -0.6°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 24,
+      "prompt": "weather in sydney",
+      "ok": true,
+      "latency_ms": 2048,
+      "reply": "Current weather in Sydney: 16.0°C, feels like 16.5°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 25,
+      "prompt": "weather in melbourne",
+      "ok": true,
+      "latency_ms": 2152,
+      "reply": "Current weather in Melbourne: 10.3°C, feels like 9.6°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 26,
+      "prompt": "weather in singapore",
+      "ok": true,
+      "latency_ms": 2152,
+      "reply": "Current weather in Temasek: 26.2°C, feels like 32.1°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 27,
+      "prompt": "weather in bangalore",
+      "ok": true,
+      "latency_ms": 2147,
+      "reply": "Current weather in Bengaluru: 23.3°C, feels like 25.4°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 28,
+      "prompt": "weather in hyderabad",
+      "ok": true,
+      "latency_ms": 2148,
+      "reply": "Current weather in Hyderabad: 25.0°C, feels like 28.8°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 29,
+      "prompt": "weather in seoul",
+      "ok": true,
+      "latency_ms": 2159,
+      "reply": "Current weather in Seoul: 5.5°C, feels like 3.8°C, Mainly clear.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 30,
+      "prompt": "weather in osaka",
+      "ok": true,
+      "latency_ms": 2245,
+      "reply": "Current weather in Osaka: 13.8°C, feels like 14.5°C, Mainly clear.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 31,
+      "prompt": "weather in dubai",
+      "ok": true,
+      "latency_ms": 2105,
+      "reply": "Current weather in Dubai: 22.1°C, feels like 24.7°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 32,
+      "prompt": "weather in moscow",
+      "ok": true,
+      "latency_ms": 1991,
+      "reply": "Current weather in Moscow: 7.4°C, feels like 4.2°C, Partly cloudy.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 33,
+      "prompt": "weather in rome",
+      "ok": true,
+      "latency_ms": 2158,
+      "reply": "Current weather in Rome: 15.8°C, feels like 14.0°C, Clear sky.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 34,
+      "prompt": "weather in madrid",
+      "ok": true,
+      "latency_ms": 2152,
+      "reply": "Current weather in Madrid: 19.2°C, feels like 17.4°C, Clear sky.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 35,
+      "prompt": "weather in amsterdam",
+      "ok": true,
+      "latency_ms": 2105,
+      "reply": "Current weather in Amsterdam: 13.6°C, feels like 10.7°C, Partly cloudy.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 36,
+      "prompt": "weather in zurich",
+      "ok": true,
+      "latency_ms": 2082,
+      "reply": "Current weather in Zurich: 12.8°C, feels like 11.4°C, Clear sky.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 37,
+      "prompt": "weather in stockholm",
+      "ok": true,
+      "latency_ms": 2255,
+      "reply": "Current weather in Stockholm: 4.9°C, feels like 0.3°C, Mainly clear.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 38,
+      "prompt": "weather in helsinki",
+      "ok": true,
+      "latency_ms": 2089,
+      "reply": "Current weather in Helsingfors: 3.3°C, feels like -0.7°C, Light drizzle.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 39,
+      "prompt": "weather in oslo",
+      "ok": true,
+      "latency_ms": 1877,
+      "reply": "Current weather in Oslo: 5.2°C, feels like 2.2°C, Mainly clear.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 40,
+      "prompt": "weather in lisbon",
+      "ok": true,
+      "latency_ms": 2784,
+      "reply": "Current weather in Lisbon: 19.8°C, feels like 18.4°C, Clear sky.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 41,
+      "prompt": "weather in vienna",
+      "ok": true,
+      "latency_ms": 1777,
+      "reply": "Current weather in Vienna: 12.2°C, feels like 9.4°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 42,
+      "prompt": "weather in prague",
+      "ok": true,
+      "latency_ms": 2430,
+      "reply": "Current weather in Prague: 11.8°C, feels like 9.9°C, Partly cloudy.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 43,
+      "prompt": "weather in warsaw",
+      "ok": true,
+      "latency_ms": 2244,
+      "reply": "Current weather in Warsaw: 8.9°C, feels like 5.4°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 44,
+      "prompt": "weather in athens",
+      "ok": true,
+      "latency_ms": 2149,
+      "reply": "Current weather in Athens: 13.0°C, feels like 12.5°C, Partly cloudy.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 45,
+      "prompt": "weather in istanbul",
+      "ok": true,
+      "latency_ms": 2050,
+      "reply": "Current weather in Istanbul: 9.9°C, feels like 7.9°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 46,
+      "prompt": "search web for latest python asyncio best practices",
+      "ok": true,
+      "latency_ms": 931,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 47,
+      "prompt": "search web for fastapi websocket scaling tips",
+      "ok": true,
+      "latency_ms": 812,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 48,
+      "prompt": "search web for electron secure ipc checklist",
+      "ok": true,
+      "latency_ms": 649,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 49,
+      "prompt": "search web for react performance profiling guide",
+      "ok": true,
+      "latency_ms": 1099,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 50,
+      "prompt": "search web for ollama model quantization explained",
+      "ok": true,
+      "latency_ms": 709,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 51,
+      "prompt": "search web for windows powershell process management tips",
+      "ok": true,
+      "latency_ms": 1238,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 52,
+      "prompt": "search web for top vscode productivity extensions",
+      "ok": true,
+      "latency_ms": 812,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 53,
+      "prompt": "search web for python logging structured json examples",
+      "ok": true,
+      "latency_ms": 714,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 54,
+      "prompt": "search web for open meteo weather code table",
+      "ok": true,
+      "latency_ms": 1970,
+      "reply": "Current weather in Bengaluru: 23.3°C, feels like 25.4°C, Overcast.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 55,
+      "prompt": "search web for semantic routing in llm apps",
+      "ok": true,
+      "latency_ms": 1106,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 56,
+      "prompt": "search web for robust retry backoff patterns",
+      "ok": true,
+      "latency_ms": 816,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 57,
+      "prompt": "search web for websocket heartbeat implementation",
+      "ok": true,
+      "latency_ms": 818,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 58,
+      "prompt": "search web for model function calling reliability",
+      "ok": true,
+      "latency_ms": 644,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 59,
+      "prompt": "search web for python path traversal prevention",
+      "ok": true,
+      "latency_ms": 640,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 60,
+      "prompt": "search web for secure file write validation",
+      "ok": true,
+      "latency_ms": 661,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 61,
+      "prompt": "search web for local first ai architecture",
+      "ok": true,
+      "latency_ms": 637,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 62,
+      "prompt": "search web for desktop assistant ux best practices",
+      "ok": true,
+      "latency_ms": 613,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 63,
+      "prompt": "search web for pydantic model validator examples",
+      "ok": true,
+      "latency_ms": 672,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 64,
+      "prompt": "search web for fastapi readiness endpoint best practices",
+      "ok": true,
+      "latency_ms": 654,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 65,
+      "prompt": "search web for gpu monitoring python library alternatives",
+      "ok": true,
+      "latency_ms": 632,
+      "reply": "Done. search_web executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 66,
+      "prompt": "what time is it right now",
+      "ok": true,
+      "latency_ms": 1160,
+      "reply": "It's 01:42 AM on Sunday, April 05, 2026.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 67,
+      "prompt": "what day and date is today",
+      "ok": true,
+      "latency_ms": 1031,
+      "reply": "action='data_query' tool_name='calendar' arguments='{\"date\": \"today\"}'",
+      "leak": true,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 68,
+      "prompt": "what can you do right now in this build",
+      "ok": true,
+      "latency_ms": 1912,
+      "reply": "I am online, but I returned an empty response from local model.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 69,
+      "prompt": "what is your status",
+      "ok": true,
+      "latency_ms": 759,
+      "reply": "action='system_status'",
+      "leak": true,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 70,
+      "prompt": "give me one short productivity tip",
+      "ok": true,
+      "latency_ms": 1464,
+      "reply": "action='productivity_tip' tool_name='focus_boost' arguments='{\"tip\": \"Use the Pomodoro Technique: work for 25 minutes, then take a 5-minute break.\"}'",
+      "leak": true,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 71,
+      "prompt": "tell me a concise plan for focus work",
+      "ok": true,
+      "latency_ms": 1394,
+      "reply": "Set timer for 90 minutes, work without interruptions. Take 10-15 minute break when timer expires. Repeat cycle to maintain productivity and minimize distractions.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 72,
+      "prompt": "give me a short joke clean only",
+      "ok": true,
+      "latency_ms": 1446,
+      "reply": "action='joke' tool_name='humor_bot' arguments='{\"type\": \"one-liner\", \"text\": \"Why did the coffee file a police report? It got mugged!\"}'",
+      "leak": true,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 73,
+      "prompt": "explain in one line what this assistant is",
+      "ok": true,
+      "latency_ms": 1157,
+      "reply": "I am JARVIS, a hyper-capable AI desktop assistant designed to manage and automate various tasks for my users.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 74,
+      "prompt": "how do you handle tool calls internally in short",
+      "ok": true,
+      "latency_ms": 1662,
+      "reply": "action='system_status' I process tool calls by parsing the 'tool_call' action, extracting the relevant information (e.g., tool_name and arguments), and routing it to the corresponding module within my system architecture for execution or further processing.",
+      "leak": true,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 75,
+      "prompt": "give me a brief safety note for automation",
+      "ok": true,
+      "latency_ms": 1453,
+      "reply": "action='safety_note' I remind you that automation can be hazardous if not designed with caution; always review and test scripts thoroughly before executing them, especially when interacting with physical systems or critical infrastructure.",
+      "leak": true,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 76,
+      "prompt": "in one line explain why retries matter",
+      "ok": true,
+      "latency_ms": 1165,
+      "reply": "Retries ensure system reliability by allowing for the correction of transient errors, preventing data loss and ensuring continuity in automated processes.",
+      "leak": false,
+      "toolish": false,
+      "errorish": true
+    },
+    {
+      "i": 77,
+      "prompt": "briefly compare local model and cloud model",
+      "ok": true,
+      "latency_ms": 3787,
+      "reply": "action='model_comparison' Local models are self-contained, offline versions of my capabilities, while cloud models utilize remote servers to access scalable, up-to-date information; the choice between them depends on connectivity needs and system constraints.",
+      "leak": true,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 78,
+      "prompt": "what is the quickest way to debug failing api routes",
+      "ok": true,
+      "latency_ms": 1876,
+      "reply": "I am online, but I returned an empty response from local model.",
+      "leak": false,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 79,
+      "prompt": "one-line tip for writing clean typescript",
+      "ok": true,
+      "latency_ms": 1293,
+      "reply": "action='typescript_tip' Use interfaces or type aliases to define data structures and function signatures, ensuring explicitness and maintainability in your TypeScript codebase.",
+      "leak": true,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 80,
+      "prompt": "one-line tip for robust python exception handling",
+      "ok": true,
+      "latency_ms": 1501,
+      "reply": "action='python_exception_handling' Utilize Python's built-in `try-except` block with specific exception types and logging mechanisms to catch and log exceptions in a structured manner, rather than relying on bare `except` clauses.",
+      "leak": true,
+      "toolish": false,
+      "errorish": false
+    },
+    {
+      "i": 81,
+      "prompt": "write code for a tiny util function util_1 that returns string 'ok-1' in src/ai_stress_round6/util_1.ts",
+      "ok": true,
+      "latency_ms": 1481,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_1.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 82,
+      "prompt": "write code for a tiny util function util_2 that returns string 'ok-2' in src/ai_stress_round6/util_2.ts",
+      "ok": true,
+      "latency_ms": 1453,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_2.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 83,
+      "prompt": "write code for a tiny util function util_3 that returns string 'ok-3' in src/ai_stress_round6/util_3.ts",
+      "ok": true,
+      "latency_ms": 1447,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_3.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 84,
+      "prompt": "write code for a tiny util function util_4 that returns string 'ok-4' in src/ai_stress_round6/util_4.ts",
+      "ok": true,
+      "latency_ms": 1434,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_4.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 85,
+      "prompt": "write code for a tiny util function util_5 that returns string 'ok-5' in src/ai_stress_round6/util_5.ts",
+      "ok": true,
+      "latency_ms": 1435,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_5.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 86,
+      "prompt": "write code for a tiny util function util_6 that returns string 'ok-6' in src/ai_stress_round6/util_6.ts",
+      "ok": true,
+      "latency_ms": 1444,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_6.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 87,
+      "prompt": "write code for a tiny util function util_7 that returns string 'ok-7' in src/ai_stress_round6/util_7.ts",
+      "ok": true,
+      "latency_ms": 1460,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_7.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 88,
+      "prompt": "write code for a tiny util function util_8 that returns string 'ok-8' in src/ai_stress_round6/util_8.ts",
+      "ok": true,
+      "latency_ms": 1470,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_8.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 89,
+      "prompt": "write code for a tiny util function util_9 that returns string 'ok-9' in src/ai_stress_round6/util_9.ts",
+      "ok": true,
+      "latency_ms": 1477,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_9.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 90,
+      "prompt": "write code for a tiny util function util_10 that returns string 'ok-10' in src/ai_stress_round6/util_10.ts",
+      "ok": true,
+      "latency_ms": 1472,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_10.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 91,
+      "prompt": "write code for a tiny util function util_11 that returns string 'ok-11' in src/ai_stress_round6/util_11.ts",
+      "ok": true,
+      "latency_ms": 1476,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_11.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 92,
+      "prompt": "write code for a tiny util function util_12 that returns string 'ok-12' in src/ai_stress_round6/util_12.ts",
+      "ok": true,
+      "latency_ms": 1475,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_12.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 93,
+      "prompt": "write code for a tiny util function util_13 that returns string 'ok-13' in src/ai_stress_round6/util_13.ts",
+      "ok": true,
+      "latency_ms": 1514,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_13.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 94,
+      "prompt": "write code for a tiny util function util_14 that returns string 'ok-14' in src/ai_stress_round6/util_14.ts",
+      "ok": true,
+      "latency_ms": 1483,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_14.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 95,
+      "prompt": "write code for a tiny util function util_15 that returns string 'ok-15' in src/ai_stress_round6/util_15.ts",
+      "ok": true,
+      "latency_ms": 1477,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_15.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 96,
+      "prompt": "write code for a tiny util function util_16 that returns string 'ok-16' in src/ai_stress_round6/util_16.ts",
+      "ok": true,
+      "latency_ms": 1481,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_16.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 97,
+      "prompt": "write code for a tiny util function util_17 that returns string 'ok-17' in src/ai_stress_round6/util_17.ts",
+      "ok": true,
+      "latency_ms": 1459,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_17.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 98,
+      "prompt": "write code for a tiny util function util_18 that returns string 'ok-18' in src/ai_stress_round6/util_18.ts",
+      "ok": true,
+      "latency_ms": 1451,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_18.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 99,
+      "prompt": "write code for a tiny util function util_19 that returns string 'ok-19' in src/ai_stress_round6/util_19.ts",
+      "ok": true,
+      "latency_ms": 1440,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_19.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 100,
+      "prompt": "write code for a tiny util function util_20 that returns string 'ok-20' in src/ai_stress_round6/util_20.ts",
+      "ok": true,
+      "latency_ms": 1533,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_20.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 101,
+      "prompt": "write code for a tiny util function util_21 that returns string 'ok-21' in src/ai_stress_round6/util_21.ts",
+      "ok": true,
+      "latency_ms": 1372,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_21.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 102,
+      "prompt": "write code for a tiny util function util_22 that returns string 'ok-22' in src/ai_stress_round6/util_22.ts",
+      "ok": true,
+      "latency_ms": 1374,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_22.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 103,
+      "prompt": "write code for a tiny util function util_23 that returns string 'ok-23' in src/ai_stress_round6/util_23.ts",
+      "ok": true,
+      "latency_ms": 1492,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_23.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 104,
+      "prompt": "write code for a tiny util function util_24 that returns string 'ok-24' in src/ai_stress_round6/util_24.ts",
+      "ok": true,
+      "latency_ms": 1402,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_24.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 105,
+      "prompt": "write code for a tiny util function util_25 that returns string 'ok-25' in src/ai_stress_round6/util_25.ts",
+      "ok": true,
+      "latency_ms": 1370,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_25.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 106,
+      "prompt": "write code for a tiny util function util_26 that returns string 'ok-26' in src/ai_stress_round6/util_26.ts",
+      "ok": true,
+      "latency_ms": 1394,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_26.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 107,
+      "prompt": "write code for a tiny util function util_27 that returns string 'ok-27' in src/ai_stress_round6/util_27.ts",
+      "ok": true,
+      "latency_ms": 1461,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_27.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 108,
+      "prompt": "write code for a tiny util function util_28 that returns string 'ok-28' in src/ai_stress_round6/util_28.ts",
+      "ok": true,
+      "latency_ms": 1441,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_28.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 109,
+      "prompt": "write code for a tiny util function util_29 that returns string 'ok-29' in src/ai_stress_round6/util_29.ts",
+      "ok": true,
+      "latency_ms": 1483,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_29.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 110,
+      "prompt": "write code for a tiny util function util_30 that returns string 'ok-30' in src/ai_stress_round6/util_30.ts",
+      "ok": true,
+      "latency_ms": 1447,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\util_30.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 111,
+      "prompt": "set brightness to 35",
+      "ok": true,
+      "latency_ms": 603,
+      "reply": "Done. control_brightness executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 112,
+      "prompt": "increase brightness to 55",
+      "ok": true,
+      "latency_ms": 508,
+      "reply": "Done. control_brightness executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 113,
+      "prompt": "set volume to 20",
+      "ok": true,
+      "latency_ms": 85,
+      "reply": "Done. control_volume executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 114,
+      "prompt": "increase volume to 45",
+      "ok": true,
+      "latency_ms": 111,
+      "reply": "Done. control_volume executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 115,
+      "prompt": "open notepad",
+      "ok": true,
+      "latency_ms": 229,
+      "reply": "Done. open_application executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 116,
+      "prompt": "launch calculator",
+      "ok": true,
+      "latency_ms": 176,
+      "reply": "Done. open_application executed successfully.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 117,
+      "prompt": "run command whoami",
+      "ok": true,
+      "latency_ms": 3168,
+      "reply": "I can help with tool actions—tell me exactly what you'd like me to do.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 118,
+      "prompt": "create file src/ai_stress_round6/manual_note_1.txt with hello from stress test",
+      "ok": true,
+      "latency_ms": 90,
+      "reply": "Created file at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\manual_note_1.txt.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 119,
+      "prompt": "create file src/ai_stress_round6/manual_note_2.txt with second hello",
+      "ok": true,
+      "latency_ms": 121,
+      "reply": "Created file at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\manual_note_2.txt.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 120,
+      "prompt": "delete file src/ai_stress_round6/manual_note_2.txt",
+      "ok": true,
+      "latency_ms": 132,
+      "reply": "Deleted C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\manual_note_2.txt.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 121,
+      "prompt": "create directory src/ai_stress_round6/generated",
+      "ok": true,
+      "latency_ms": 126,
+      "reply": "Created directory C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\generated.",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 122,
+      "prompt": "list files in src/ai_stress_round6",
+      "ok": true,
+      "latency_ms": 144,
+      "reply": "Files in C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6: generated/, manual_note_1.txt, util_1.ts, util_10.ts, util_11.ts, util_12.ts, util_13.ts, util_14.ts",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 123,
+      "prompt": "read file src/ai_stress_round6/manual_note_1.txt",
+      "ok": true,
+      "latency_ms": 129,
+      "reply": "Read C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\manual_note_1.txt: hello from stress test",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 124,
+      "prompt": "write code for function safe_add in src/ai_stress_round6/safe_add.py",
+      "ok": true,
+      "latency_ms": 1964,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\safe_add.py",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    },
+    {
+      "i": 125,
+      "prompt": "create tool style helper in src/ai_stress_round6/helper_tool.js",
+      "ok": true,
+      "latency_ms": 1617,
+      "reply": "Code created at C:\\Users\\anand\\Repos\\Jarvis\\src\\ai_stress_round6\\helper_tool.js",
+      "leak": false,
+      "toolish": true,
+      "errorish": false
+    }
+  ]
+}
