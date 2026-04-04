@@ -29,6 +29,8 @@ class Settings:
     picovoice_access_key: str = os.getenv("PICOVOICE_ACCESS_KEY", "")
     vision_provider: str = os.getenv("JARVIS_VISION_PROVIDER", "local")
     privacy_mode: bool = os.getenv("JARVIS_PRIVACY_MODE", "true").lower() == "true"
+    gesture_enabled: bool = os.getenv("JARVIS_GESTURE_ENABLED", "false").lower() == "true"
+    gesture_camera_index: int = int(os.getenv("JARVIS_GESTURE_CAMERA_INDEX", "0"))
     system_metrics_interval: float = float(os.getenv("JARVIS_SYSTEM_METRICS_INTERVAL", "1.0"))
 
 

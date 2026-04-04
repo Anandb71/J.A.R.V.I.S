@@ -16,3 +16,4 @@ edge-tts>=6.1.0
 faster-whisper>=1.1.0
 pvporcupine>=3.0.0
 pvrecorder>=1.2.0
+mediapipe>=0.10.14

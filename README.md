@@ -126,12 +126,19 @@ Master plan:
 
 ## Status
 
-Current phase: **Phase 0 scaffold in progress (Electron shell + FastAPI core + HUD starter wired)**.
+Current phase: **Phase 10 hardening in progress**.
+
+Implemented in repo now:
+- Electron shell with IPC sender validation + permission/CSP security hardening
+- FastAPI backend with local-first AI routing, tool safety policy, memory, and streaming chat
+- Full-duplex voice path (VAD + STT + streaming TTS)
+- Vision inspection/capture with privacy filtering and sensitive-window redaction
+- Structured tool audit logging and gesture subsystem scaffolding (feature-gated)
 
 Next milestone focus:
-- harden runtime integration,
-- add voice MVP modules,
-- implement AI provider router (local-first + optional cloud) with telemetry from day one.
+- complete gesture runtime integration and tune gesture confidence thresholds,
+- validate packaging pipeline (`PyInstaller` + `electron-builder`) end-to-end,
+- expand automated tests and soak-run observability checks.
 
 ---
 

@@ -7,12 +7,14 @@ from dataclasses import dataclass
 from pathlib import Path
 import platform
 import subprocess
+import time
 import uuid
 from typing import Any
 
 from backend.api.websocket_hub import BroadcastMessage, WebSocketHub
+from backend.core.tools import TOOL_RISK_TIERS, evaluate_tool_request
 from backend.logging import get_logger
-from backend.core.tools import evaluate_tool_request
+from backend.security.audit import log_tool_invocation
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 log = get_logger(__name__)
@@ -131,7 +133,18 @@ class ToolExecutor:
                 output={"error": "No handler registered for tool."},
             )
 
+        started = time.perf_counter()
         result = await handler(args)
+        duration_ms = (time.perf_counter() - started) * 1000
+        tier = TOOL_RISK_TIERS.get(tool_name)
+        tier_name = tier.name if tier is not None else "unknown"
+        log_tool_invocation(
+            tool_name=tool_name,
+            arguments=args,
+            status=result.status,
+            tier=tier_name,
+            duration_ms=duration_ms,
+        )
         log.info("tools.dispatch.result", tool_name=tool_name, status=result.status)
         return result
 

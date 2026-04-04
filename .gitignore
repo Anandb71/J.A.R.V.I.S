@@ -13,6 +13,7 @@ __pycache__/
 dist/
 build/
 *.spec
+!jarvis-backend.spec
 
 # Generated runtime data
 .jarvis/

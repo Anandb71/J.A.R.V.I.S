@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import Any
 
 
-SAFE_TOOL_ALLOWLIST = {
-    "open_application",
-    "search_web",
-    "system_info",
-    "set_reminder",
-    "control_volume",
-}
+class ToolRisk(IntEnum):
+    SAFE = 0
+    VISUAL = 1
+    KEYBOARD = 2
+    DENY = 3
 
-DANGEROUS_TOOLS_REQUIRE_CONFIRMATION = {
-    "run_command",
-    "manage_files",
+
+TOOL_RISK_TIERS: dict[str, ToolRisk] = {
+    "system_info": ToolRisk.SAFE,
+    "search_web": ToolRisk.SAFE,
+    "set_reminder": ToolRisk.SAFE,
+    "open_application": ToolRisk.VISUAL,
+    "control_volume": ToolRisk.VISUAL,
+    "run_command": ToolRisk.KEYBOARD,
+    "manage_files": ToolRisk.KEYBOARD,
 }
 
 
@@ -149,21 +154,28 @@ class ToolDecision:
 def evaluate_tool_request(tool_name: str, arguments: dict[str, Any] | None = None) -> ToolDecision:
     _ = arguments or {}
 
-    if tool_name in SAFE_TOOL_ALLOWLIST:
-        return ToolDecision(name=tool_name, allowed=True, reason="safe_allowlist")
+    tier = TOOL_RISK_TIERS.get(tool_name)
+    if tier is None:
+        return ToolDecision(name=tool_name, allowed=False, reason="tool_not_registered")
 
-    if tool_name in DANGEROUS_TOOLS_REQUIRE_CONFIRMATION:
+    if tier == ToolRisk.DENY:
+        return ToolDecision(name=tool_name, allowed=False, reason="hardcoded_deny")
+
+    if tier == ToolRisk.SAFE:
+        return ToolDecision(name=tool_name, allowed=True, reason="tier_safe")
+
+    if tier in {ToolRisk.VISUAL, ToolRisk.KEYBOARD}:
         return ToolDecision(
             name=tool_name,
             allowed=False,
             requires_confirmation=True,
-            reason="requires_explicit_user_confirmation",
+            reason=f"tier_{tier.name.lower()}_requires_confirmation",
         )
 
     return ToolDecision(
         name=tool_name,
         allowed=False,
-        reason="tool_not_allowlisted",
+        reason="unknown_tier",
     )
 
 

@@ -15,12 +15,21 @@ class PythonBridge {
     if (this.process) return;
 
     const projectRoot = path.resolve(__dirname, '..');
-    const runtimeRoot = app.isPackaged ? process.resourcesPath : projectRoot;
-    const venvPython = path.join(projectRoot, '.venv', 'Scripts', 'python.exe');
-    const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
+    let cmd = '';
+    let args = [];
+    let runtimeRoot = projectRoot;
+
+    if (app.isPackaged) {
+      cmd = path.join(process.resourcesPath, 'backend', 'jarvis-backend.exe');
+      runtimeRoot = path.join(process.resourcesPath, 'backend');
+    } else {
+      const venvPython = path.join(projectRoot, '.venv', 'Scripts', 'python.exe');
+      cmd = fs.existsSync(venvPython) ? venvPython : 'python';
+      args = ['-m', 'backend.main'];
+    }
 
     this.intentionalStop = false;
-    this.process = spawn(pythonCmd, ['-m', 'backend.main'], {
+    this.process = spawn(cmd, args, {
       cwd: runtimeRoot,
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,

@@ -1,6 +1,6 @@
 {
   "name": "jarvis-desktop-assistant",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Project JARVIS - Electron + FastAPI desktop AI assistant",
   "main": "electron/main.js",
   "private": true,
@@ -8,12 +8,61 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
+    "build:backend": "scripts\\build-backend.bat",
+    "build": "electron-builder --win",
+    "build:dir": "electron-builder --win --dir",
     "lint": "echo \"Linting not configured yet\"",
     "typecheck": "echo \"Typecheck not configured yet\""
+  },
+  "build": {
+    "appId": "com.jarvis.desktop",
+    "productName": "JARVIS",
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/jarvis-backend",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "src/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "grantFileProtocolExtraPrivileges": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Anandb71",
+        "repo": "J.A.R.V.I.S"
+      }
+    ]
   },
   "dependencies": {
     "@ricky0123/vad-web": "^0.0.18",
     "electron": "^33.0.0",
+    "electron-updater": "^6.0.0",
     "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^25.0.0"
   }
 }
