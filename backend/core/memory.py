@@ -25,6 +25,7 @@ class RAGMemory:
         self._sliding_window: list[dict[str, str]] = []
         self._lock = asyncio.Lock()
         self._chroma_semaphore = asyncio.Semaphore(1)
+        self._bg_tasks: set[asyncio.Task[None]] = set()
 
         self.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         self.CHROMA_PATH.mkdir(parents=True, exist_ok=True)
@@ -49,7 +50,9 @@ class RAGMemory:
                 self._sliding_window = self._sliding_window[-self.SLIDING_WINDOW_SIZE :]
 
         await asyncio.to_thread(self._save_sqlite_message, role, content)
-        asyncio.create_task(self._embed_and_store(role, content))
+        task = asyncio.create_task(self._embed_and_store(role, content))
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
 
     async def build_context(self, user_message: str, system_prompt: dict[str, str]) -> list[dict[str, str]]:
         retrieved = await self.get_relevant_context(user_message)

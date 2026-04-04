@@ -39,28 +39,40 @@ hub = WebSocketHub()
 
 async def heartbeat_task() -> None:
     while True:
-        await hub.broadcast(
-            BroadcastMessage(
-                event="heartbeat",
-                payload={
-                    "service": settings.app_name,
-                    "connections": hub.connection_count,
-                },
+        try:
+            await hub.broadcast(
+                BroadcastMessage(
+                    event="heartbeat",
+                    payload={
+                        "service": settings.app_name,
+                        "connections": hub.connection_count,
+                    },
+                )
             )
-        )
-        await asyncio.sleep(1)
+            await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            log.error("heartbeat_task.error", error=str(exc))
+            await asyncio.sleep(1)
 
 
 async def gesture_events_task(_app: FastAPI) -> None:
     while True:
-        tracker = getattr(_app.state, "gesture_tracker", None)
-        if tracker is None or not tracker.is_running:
-            await asyncio.sleep(0.25)
-            continue
+        try:
+            tracker = getattr(_app.state, "gesture_tracker", None)
+            if tracker is None or not tracker.is_running:
+                await asyncio.sleep(0.25)
+                continue
 
-        event = await tracker.next_event(timeout=0.5)
-        if event:
-            await hub.broadcast(BroadcastMessage(event="gesture:event", payload=event))
+            event = await tracker.next_event(timeout=0.5)
+            if event:
+                await hub.broadcast(BroadcastMessage(event="gesture:event", payload=event))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            log.error("gesture_events_task.error", error=str(exc))
+            await asyncio.sleep(1)
 
 
 @asynccontextmanager
@@ -123,6 +135,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # Binary frame: audio data from client microphone
             if raw.get("bytes"):
+                audio_bytes = raw["bytes"]
+                if len(audio_bytes) > 64 * 1024:
+                    log.warning("ws.audio_frame.too_large", size=len(audio_bytes))
+                    continue
                 if hasattr(app.state, "duplex_pipelines"):
                     pipeline = app.state.duplex_pipelines.get(id(websocket))
                     if not pipeline:
@@ -132,7 +148,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             websocket=websocket,
                         )
                         app.state.duplex_pipelines[id(websocket)] = pipeline
-                    await pipeline.handle_audio_data(raw["bytes"])
+                    await pipeline.handle_audio_data(audio_bytes)
                 continue
 
             # Text frame: JSON event

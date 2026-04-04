@@ -46,7 +46,11 @@ class SystemMonitor:
             self._gpu_available = True
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             self._nvml_handle = handle
-            self._nvml_name = pynvml.nvmlDeviceGetName(handle).decode("utf-8", errors="ignore")
+            raw_name = pynvml.nvmlDeviceGetName(handle)
+            if isinstance(raw_name, bytes):
+                self._nvml_name = raw_name.decode("utf-8", errors="replace")
+            else:
+                self._nvml_name = str(raw_name)
             log.info("monitor.gpu.initialized", gpu_name=self._nvml_name)
         except Exception:
             self._gpu_available = False
@@ -58,9 +62,15 @@ class SystemMonitor:
     async def run(self) -> None:
         log.info("monitor.started", interval=self.interval)
         while True:
-            metrics = await asyncio.to_thread(self._collect_all)
-            await self.hub.broadcast(BroadcastMessage(event="system:metrics", payload=metrics))
-            await asyncio.sleep(self.interval)
+            try:
+                metrics = await asyncio.to_thread(self._collect_all)
+                await self.hub.broadcast(BroadcastMessage(event="system:metrics", payload=metrics))
+                await asyncio.sleep(self.interval)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                log.error("monitor.loop.error", error=str(exc))
+                await asyncio.sleep(self.interval)
 
     def _collect_all(self) -> dict[str, Any]:
         cpu = self._collect_cpu_ram()

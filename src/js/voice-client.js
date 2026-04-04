@@ -22,34 +22,45 @@ export class VoiceClient {
   async start() {
     if (this.isActive) return;
 
-    // 1. Mic capture with echo/noise suppression
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        channelCount: 1,
-        sampleRate: 16000,
-      },
-    });
+    try {
+      // 1. Mic capture with echo/noise suppression
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+          sampleRate: 16000,
+        },
+      });
 
-    // 2. Silero VAD via @ricky0123/vad-web
-    const { MicVAD } = await import('@ricky0123/vad-web');
+      // 2. Silero VAD via @ricky0123/vad-web
+      const { MicVAD } = await import('@ricky0123/vad-web');
 
-    this.vad = await MicVAD.new({
-      stream: this.stream,
-      onSpeechStart: () => this._onSpeechStart(),
-      onSpeechEnd: (audio) => this._onSpeechEnd(audio),
-      positiveSpeechThreshold: 0.8,
-      negativeSpeechThreshold: 0.3,
-      redemptionFrames: 8,
-      preSpeechPadFrames: 1,
-      minSpeechFrames: 3,
-    });
+      this.vad = await MicVAD.new({
+        stream: this.stream,
+        onSpeechStart: () => this._onSpeechStart(),
+        onSpeechEnd: (audio) => this._onSpeechEnd(audio),
+        positiveSpeechThreshold: 0.8,
+        negativeSpeechThreshold: 0.3,
+        redemptionFrames: 8,
+        preSpeechPadFrames: 1,
+        minSpeechFrames: 3,
+      });
 
-    this.vad.start();
-    this.isActive = true;
-    this.onStateChange?.('listening');
+      this.vad.start();
+      this.isActive = true;
+      this.onStateChange?.('listening');
+    } catch (error) {
+      this.vad?.destroy?.();
+      this.vad = null;
+      if (this.stream) {
+        this.stream.getTracks().forEach((track) => track.stop());
+        this.stream = null;
+      }
+      this.isActive = false;
+      throw error;
+    }
   }
 
   async _onSpeechStart() {

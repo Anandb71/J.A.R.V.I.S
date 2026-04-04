@@ -7,11 +7,17 @@ class CredentialStore {
     this.filePath = path.join(basePath, 'credentials.enc');
   }
 
+  _atomicWrite(store) {
+    const tmpPath = `${this.filePath}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(store), 'utf-8');
+    fs.renameSync(tmpPath, this.filePath);
+  }
+
   save(key, value) {
     if (!safeStorage.isEncryptionAvailable()) return false;
     const store = this._load();
     store[key] = safeStorage.encryptString(String(value)).toString('base64');
-    fs.writeFileSync(this.filePath, JSON.stringify(store), 'utf-8');
+    this._atomicWrite(store);
     return true;
   }
 
@@ -31,7 +37,7 @@ class CredentialStore {
     const store = this._load();
     if (!(key in store)) return false;
     delete store[key];
-    fs.writeFileSync(this.filePath, JSON.stringify(store), 'utf-8');
+    this._atomicWrite(store);
     return true;
   }
 
