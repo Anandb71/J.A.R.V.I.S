@@ -19,6 +19,22 @@ datas = [
     *collect_data_files("sentence_transformers"),
 ]
 
+
+def _is_excluded_runtime_asset(src_path: str) -> bool:
+    lower_src = str(src_path).replace("\\", "/").lower()
+    excluded_fragments = (
+        "/.jarvis/models/",
+        "/models/",
+        "/model/",
+        "/huggingface/",
+    )
+    if any(fragment in lower_src for fragment in excluded_fragments):
+        return True
+    return lower_src.endswith((".gguf", ".bin", ".safetensors", ".pt", ".pth"))
+
+
+datas = [item for item in datas if not _is_excluded_runtime_asset(item[0])]
+
 a = Analysis(
     ["backend/main.py"],
     pathex=[],
@@ -28,7 +44,11 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        "torch",
+        "tensorflow",
+        "transformers",
+    ],
     noarchive=False,
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
