@@ -12,6 +12,7 @@ import { JarvisSocket } from './websocket.js';
 
 const WS_URL = 'ws://127.0.0.1:8765/ws';
 const API_BASE = 'http://127.0.0.1:8765/api';
+const CHAT_UNLOCK_TIMEOUT_MS = 15000;
 
 class JarvisApp {
   constructor() {
@@ -38,9 +39,11 @@ class JarvisApp {
 
     // Chatting state
     this._chatLocked = false;
+    this._chatUnlockTimer = null;
     this._lastLatency = null;
     this._assistantBuffer = '';
     this._weatherTimer = null;
+    this._textChatVoiceReplyEnabled = true;
   }
 
   /** ── Boot Sequence ──────────────────────────────────────────── */
@@ -77,6 +80,7 @@ class JarvisApp {
       chatInput: document.getElementById('chat-input'),
       btnSend: document.getElementById('btn-send'),
       btnMic: document.getElementById('btn-mic'),
+      btnToggleVoiceReply: document.getElementById('btn-toggle-voice-reply'),
       btnClickthrough: document.getElementById('btn-toggle-clickthrough'),
       btnFocus: document.getElementById('btn-toggle-hud'),
       brandPill: document.getElementById('brand-pill'),
@@ -189,8 +193,11 @@ class JarvisApp {
         break;
       case 'brain:done':
         if (this._assistantBuffer.trim()) {
-          this.chat.add('assistant', this._sanitizeAssistantText(this._assistantBuffer));
+          const assistantText = this._sanitizeAssistantText(this._assistantBuffer);
+          this.chat.add('assistant', assistantText);
+          this._speakTextReply(assistantText);
         }
+        this._clearChatUnlockFailsafe();
         this._assistantBuffer = '';
         this._setVoiceState('idle');
         this._chatLocked = false;
@@ -323,6 +330,14 @@ class JarvisApp {
       await this._toggleVoice();
     });
 
+    // Text-chat voice reply toggle
+    this._syncVoiceReplyToggleLabel();
+    this.dom.btnToggleVoiceReply?.addEventListener('click', () => {
+      this._textChatVoiceReplyEnabled = !this._textChatVoiceReplyEnabled;
+      this._syncVoiceReplyToggleLabel();
+      this.chat.addSystem(`Voice reply for typed chat ${this._textChatVoiceReplyEnabled ? 'enabled' : 'disabled'}.`);
+    });
+
     // Click-through toggle
     this.dom.btnClickthrough?.addEventListener('click', () => {
       if (window.jarvis?.toggleClickThrough) {
@@ -357,59 +372,121 @@ class JarvisApp {
   async _sendChat(message) {
     this._chatLocked = true;
     this._updateSendButton(true);
+    this._startChatUnlockFailsafe();
     this.chat.add('user', message);
 
     // Send via WebSocket if connected, else REST
     if (this.wsConnected && this.ws?.isOpen?.()) {
-      this.ws.send('chat', { message, prefer_cloud: false });
+      const sent = this.ws.send('chat', { message, prefer_cloud: false });
+      if (!sent) {
+        await this._sendChatViaRest(message);
+      }
     } else {
-      // REST fallback
-      try {
-        const resp = await fetch(`${API_BASE}/chat/stream`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message, prefer_cloud: false }),
-        });
+      await this._sendChatViaRest(message);
+    }
+  }
 
-        const reader = resp.body?.getReader();
-        const decoder = new TextDecoder();
+  async _sendChatViaRest(message) {
+    try {
+      const resp = await fetch(`${API_BASE}/chat/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, prefer_cloud: false }),
+      });
 
-        let sseBuffer = '';
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const text = decoder.decode(value, { stream: true });
-            const lines = text.split('\n');
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  if (data.event === 'brain:chunk' && data.payload?.text) {
-                    sseBuffer += data.payload.text;
-                  }
-                } catch { /* ignore malformed chunks */ }
-              }
+      const reader = resp.body?.getReader();
+      const decoder = new TextDecoder();
+
+      let sseBuffer = '';
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value, { stream: true });
+          const lines = text.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.event === 'brain:chunk' && data.payload?.text) {
+                  sseBuffer += data.payload.text;
+                }
+              } catch { /* ignore malformed chunks */ }
             }
           }
         }
-
-        if (sseBuffer.trim()) {
-          this.chat.add('assistant', this._sanitizeAssistantText(sseBuffer));
-        }
-        this._chatLocked = false;
-        this._updateSendButton(false);
-      } catch (err) {
-        this.chat.add('error', `Request failed: ${err.message}`);
-        this._chatLocked = false;
-        this._updateSendButton(false);
       }
+
+      if (sseBuffer.trim()) {
+        const assistantText = this._sanitizeAssistantText(sseBuffer);
+        this.chat.add('assistant', assistantText);
+        this._speakTextReply(assistantText);
+      }
+      this._clearChatUnlockFailsafe();
+      this._chatLocked = false;
+      this._updateSendButton(false);
+    } catch (err) {
+      this._clearChatUnlockFailsafe();
+      this.chat.add('error', `Request failed: ${err.message}`);
+      this._chatLocked = false;
+      this._updateSendButton(false);
     }
   }
 
   _updateSendButton(disabled) {
     if (this.dom.btnSend) this.dom.btnSend.disabled = disabled;
     if (this.dom.chatInput) this.dom.chatInput.disabled = disabled;
+  }
+
+  _startChatUnlockFailsafe() {
+    this._clearChatUnlockFailsafe();
+    this._chatUnlockTimer = setTimeout(() => {
+      if (!this._chatLocked) return;
+      this._chatLocked = false;
+      this._updateSendButton(false);
+      this.chat.add('error', 'JARVIS took too long to respond. Chat unlocked after 15s failsafe — please try again.');
+    }, CHAT_UNLOCK_TIMEOUT_MS);
+  }
+
+  _clearChatUnlockFailsafe() {
+    if (this._chatUnlockTimer) {
+      clearTimeout(this._chatUnlockTimer);
+      this._chatUnlockTimer = null;
+    }
+  }
+
+  _syncVoiceReplyToggleLabel() {
+    if (!this.dom.btnToggleVoiceReply) return;
+    if (this._textChatVoiceReplyEnabled) {
+      this.dom.btnToggleVoiceReply.textContent = '🔊 Voice Reply: ON';
+      this.dom.btnToggleVoiceReply.classList.add('primary');
+    } else {
+      this.dom.btnToggleVoiceReply.textContent = '🔇 Voice Reply: OFF';
+      this.dom.btnToggleVoiceReply.classList.remove('primary');
+    }
+  }
+
+  _speakTextReply(text) {
+    if (!this._textChatVoiceReplyEnabled) return;
+    const spoken = String(text || '').trim();
+    if (!spoken || !('speechSynthesis' in window)) return;
+
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(spoken);
+      utterance.rate = 1.0;
+      utterance.pitch = 0.95;
+
+      const voices = window.speechSynthesis.getVoices() || [];
+      const preferred = voices.find((v) => /en-GB/i.test(v.lang) && /ryan|male|daniel|george|libby|sonia/i.test(v.name))
+        || voices.find((v) => /en-GB/i.test(v.lang))
+        || voices.find((v) => /en/i.test(v.lang));
+      if (preferred) utterance.voice = preferred;
+
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      // noop
+    }
   }
 
   /** ── Voice ──────────────────────────────────────────────────── */
@@ -442,7 +519,7 @@ class JarvisApp {
         );
         await this.voiceClient.start();
         this.dom.btnMic.classList.add('primary');
-        this.chat.addSystem('Voice activated. Say "Hey Jarvis".');
+        this.chat.addSystem('Voice activated. Speak naturally; JARVIS will transcribe when you pause.');
       } catch (err) {
         const msg = String(err?.message || err || 'unknown error');
         if (/permission denied|notallowederror|permission/i.test(msg)) {
@@ -523,6 +600,13 @@ class JarvisApp {
   _sanitizeAssistantText(text) {
     if (!text) return text;
     const cleaned = String(text).trim();
+
+    const leakedToolCall = cleaned.match(/action\s*=\s*['\"]?tool_call['\"]?.*tool_name\s*=\s*['\"]?([a-zA-Z0-9_:-]+)['\"]?/i);
+    if (leakedToolCall) {
+      const tool = leakedToolCall[1] || 'requested tool';
+      return `I attempted to run ${tool}, but the model response format leaked internal markup. Please retry the request once.`;
+    }
+
     const m = cleaned.match(/action\s*=\s*['\"]?direct_response['\"]?\s+response\s*=\s*([\s\S]+)/i);
     if (!m) return cleaned;
     let resp = m[1].trim();
