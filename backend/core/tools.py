@@ -14,9 +14,12 @@ class ToolRisk(IntEnum):
 
 TOOL_RISK_TIERS: dict[str, ToolRisk] = {
     "system_info": ToolRisk.SAFE,
+    "screen_capture": ToolRisk.SAFE,
     "search_web": ToolRisk.SAFE,
     "fetch_webpage": ToolRisk.SAFE,
     "open_url": ToolRisk.SAFE,
+    "display_image": ToolRisk.SAFE,
+    "voice_modification": ToolRisk.SAFE,
     "set_reminder": ToolRisk.SAFE,
     "get_datetime": ToolRisk.SAFE,
     "get_weather": ToolRisk.SAFE,
@@ -44,6 +47,20 @@ OLLAMA_TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "type": "string",
                         "description": "Optional metric scope (cpu, memory, disk, network).",
                     }
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "screen_capture",
+            "description": "Capture metadata about the active screen/window for on-device assistance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "max_depth": {"type": "integer", "minimum": 1, "maximum": 5},
+                    "max_nodes": {"type": "integer", "minimum": 8, "maximum": 256},
                 },
             },
         },
@@ -119,6 +136,34 @@ OLLAMA_TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "display_image",
+            "description": "Display an image by opening its URL or local file path.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "Image URL."},
+                    "path": {"type": "string", "description": "Optional local image path."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "voice_modification",
+            "description": "Adjust runtime voice profile preferences for JARVIS responses.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "voice_type": {"type": "string"},
+                    "tone": {"type": "string"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "set_reminder",
             "description": "Set a reminder for the user.",
             "parameters": {
@@ -143,9 +188,19 @@ OLLAMA_TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 100,
-                    }
+                    },
+                    "action": {
+                        "type": "string",
+                        "description": "Optional volume action: set, mute, unmute, up, down.",
+                        "enum": ["set", "mute", "unmute", "up", "down"],
+                    },
+                    "delta": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50,
+                        "description": "Optional step size for up/down actions.",
+                    },
                 },
-                "required": ["level"],
             },
         },
     },
@@ -191,6 +246,10 @@ OLLAMA_TOOL_SCHEMAS: list[dict[str, Any]] = [
                 "properties": {
                     "operation": {"type": "string"},
                     "path": {"type": "string"},
+                    "destination": {
+                        "type": "string",
+                        "description": "Destination path for move/copy operations.",
+                    },
                     "target": {
                         "type": "string",
                         "description": "Content for write operations.",

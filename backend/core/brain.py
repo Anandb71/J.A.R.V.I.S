@@ -5,6 +5,7 @@ import ast
 import json
 import re
 import time
+from urllib.parse import quote_plus
 from typing import Any
 
 import httpx
@@ -84,6 +85,9 @@ class AIBrain:
             "- Use dry British wit sparingly — never forced humor\n"
             "- If the user addressed you by name, acknowledge it naturally\n"
             "- For greetings, be warm and contextual (reference the time of day)\n"
+            "- Whenever you execute a system tool, reply with a brief, natural conversational confirmation in the voice of a polite British butler\n"
+            "- Never reply with single-word confirmations like 'Done.'\n"
+            "- You may only call tools that are explicitly registered in the tool schema; never invent tool names\n"
             "- Never say 'As an AI' or 'I'm just a language model'\n"
             "- You are JARVIS. Own it."
         )
@@ -378,11 +382,12 @@ class AIBrain:
         text = message.lower()
         triggers = (
             "open ", "launch ", "set ", "turn ", "increase ", "decrease ", "dim ",
-            "brightness", "volume", "remind", "create file", "delete file", "create directory", "mkdir ",
-            "list files", "read file", "run ",
+            "brightness", "volume", "mute", "unmute", "remind", "create file", "delete file", "create directory", "mkdir ",
+            "list files", "read file", "copy file", "move file", "append to file", "run ", "execute command", "powershell",
             "what's my cpu", "what is my cpu", "cpu usage", "memory usage", "disk usage",
+            "what do u see", "what do you see", "on my screen", "in my screen", "show me image", "show images",
             "weather in", "time in", "get weather",
-            "search web", "search for", "write code", "generate code", "create tool",
+            "search web", "search for", "write code", "generate code", "create tool", "make a tool", "close app", "kill app", "close ",
             "open website", "visit website", "open url", "fetch webpage", "summarize this page",
         )
         return any(t in text for t in triggers)
@@ -478,7 +483,7 @@ class AIBrain:
             if action in {"data_query", "show_current_date", "show_date", "show_time", "current_time"}:
                 from datetime import datetime
                 return f"It is {datetime.now().strftime('%I:%M %p, %A %B %d, %Y')}."
-            return "Done."
+            return "I completed that step."
 
         # Handle multiline leaks such as:
         # action='direct_response'\nHello there.
@@ -560,6 +565,17 @@ class AIBrain:
                 "like launching apps or adjusting brightness and volume (with confirmation for sensitive actions)."
             )
 
+        if any(p in lower for p in ("what do u see in my screen", "what do you see in my screen", "what do you see on my screen", "what's on my screen", "what is on my screen")):
+            if not self.vision:
+                return "I don't have screen inspection enabled in this session."
+            snap = self.vision.inspect_active_window(max_depth=2, max_nodes=48)
+            window = snap.window or {}
+            if window.get("redacted"):
+                return "I can see the active window, but privacy mode redacted sensitive details."
+            title = window.get("window_title") or "an active window"
+            cls = window.get("class_name") or "unknown class"
+            return f"I can see {title} (class {cls}). If you want, I can inspect more UI details."
+
         if re.search(r"\b(what\s+is\s+your\s+status|status)\b", lower) and "weather" not in lower:
             return "I am online and ready."
 
@@ -577,6 +593,12 @@ class AIBrain:
         elif "cpu" in lower or "ram" in lower or "memory" in lower or "system info" in lower:
             tool_name = "system_info"
             args = {}
+        elif re.search(r"search\s+for\s+.+\s+in\s+chrome", lower):
+            tool_name = "run_command"
+            m = re.search(r"search\s+for\s+(.+)\s+in\s+chrome", user_message, flags=re.IGNORECASE)
+            query = (m.group(1).strip() if m else user_message)
+            query_url = f"https://www.google.com/search?q={quote_plus(query)}"
+            args = {"command": f"start chrome \"{query_url}\""}
         elif "search for" in lower or ("search" in lower and "web" in lower):
             tool_name = "search_web"
             q = re.sub(r".*search\s+(?:web\s+)?(?:for\s+)?", "", user_message, flags=re.IGNORECASE).strip()
@@ -593,6 +615,19 @@ class AIBrain:
             if not url:
                 url = re.sub(r".*(?:fetch\s+webpage|summarize\s+this\s+page|read\s+this\s+page)\s+", "", user_message, flags=re.IGNORECASE).strip()
             args = {"url": url}
+        elif any(x in lower for x in ("show me images", "show me image", "display image", "show image")):
+            url = self._extract_url_from_text(user_message)
+            if not url:
+                return "I can show images if you give me a direct image URL, and I can open it for you."
+            tool_name = "display_image"
+            args = {"url": url}
+        elif re.search(r"\bremind\s+me\s+to\b", lower):
+            tool_name = "set_reminder"
+            minutes_match = re.search(r"\bin\s+(\d{1,4})\s*(minute|minutes|min)\b", lower)
+            minutes = int(minutes_match.group(1)) if minutes_match else 10
+            reminder_text = re.sub(r"^.*?remind\s+me\s+to\s+", "", user_message, flags=re.IGNORECASE)
+            reminder_text = re.sub(r"\s+in\s+\d{1,4}\s*(?:minute|minutes|min)\b", "", reminder_text, flags=re.IGNORECASE).strip(" .")
+            args = {"text": reminder_text or "Reminder", "minutes": max(1, min(1440, minutes))}
         elif "create file" in lower:
             tool_name = "manage_files"
             pm = re.search(r"create\s+file\s+(?P<path>\S+)(?:\s+with\s+(?P<content>[\s\S]+))?", user_message, flags=re.IGNORECASE)
@@ -617,6 +652,49 @@ class AIBrain:
             tool_name = "manage_files"
             pm = re.search(r"read\s+file\s+(?P<path>\S+)", user_message, flags=re.IGNORECASE)
             args = {"operation": "read", "path": (pm.group("path").strip() if pm else "")}
+        elif "copy file" in lower:
+            tool_name = "manage_files"
+            pm = re.search(r"copy\s+file\s+(?P<src>\S+)\s+(?:to|into)\s+(?P<dst>\S+)", user_message, flags=re.IGNORECASE)
+            args = {
+                "operation": "copy",
+                "path": (pm.group("src").strip() if pm else ""),
+                "destination": (pm.group("dst").strip() if pm else ""),
+            }
+        elif "move file" in lower:
+            tool_name = "manage_files"
+            pm = re.search(r"move\s+file\s+(?P<src>\S+)\s+(?:to|into)\s+(?P<dst>\S+)", user_message, flags=re.IGNORECASE)
+            args = {
+                "operation": "move",
+                "path": (pm.group("src").strip() if pm else ""),
+                "destination": (pm.group("dst").strip() if pm else ""),
+            }
+        elif "append to file" in lower:
+            tool_name = "manage_files"
+            pm = re.search(r"append\s+to\s+file\s+(?P<path>\S+)(?:\s+with\s+)?(?P<content>[\s\S]+)$", user_message, flags=re.IGNORECASE)
+            args = {
+                "operation": "append",
+                "path": (pm.group("path").strip() if pm else ""),
+                "target": (pm.group("content").strip() if pm and pm.group("content") else ""),
+            }
+        elif re.search(r"\b(run|execute)\s+command\b", lower) or lower.startswith("powershell "):
+            tool_name = "run_command"
+            cmd = re.sub(r"^\s*(?:run|execute)\s+command\s+", "", user_message, flags=re.IGNORECASE).strip()
+            if lower.startswith("powershell "):
+                cmd = user_message
+            args = {"command": cmd}
+        elif "close everything" in lower:
+            return "I can close specific applications for you, but I won't mass-close everything blindly. Tell me exactly which apps to close."
+        elif "close app" in lower or "kill app" in lower:
+            tool_name = "run_command"
+            pm = re.search(r"(?:close|kill)\s+app\s+(?P<name>[a-zA-Z0-9_.\-]+)", user_message, flags=re.IGNORECASE)
+            app = (pm.group("name").strip() if pm else "")
+            app = app if app.lower().endswith(".exe") else (f"{app}.exe" if app else "")
+            args = {"command": f"taskkill /IM {app} /F" if app else ""}
+        elif lower.startswith("close ") and len(lower.split()) >= 2:
+            tool_name = "run_command"
+            app = re.sub(r"^close\s+", "", lower).strip().split()[0]
+            app = app if app.endswith(".exe") else f"{app}.exe"
+            args = {"command": f"taskkill /IM {app} /F"}
         elif "open " in lower or "launch " in lower:
             tool_name = "open_application"
             app_match = re.search(r"(?:open|launch)\s+(.+)$", user_message, flags=re.IGNORECASE)
@@ -624,21 +702,32 @@ class AIBrain:
         elif "disk" in lower:
             tool_name = "system_info"
             args = {}
-        elif "write code" in lower or "generate code" in lower or "create tool" in lower:
+        elif "write code" in lower or "generate code" in lower or "create tool" in lower or "make a tool" in lower:
             tool_name = "ai_write_code"
             path_match = re.search(r"(?:in|to|at)\s+(src[\\/][^\s]+)", user_message, flags=re.IGNORECASE)
             args = {
                 "task": user_message,
-                "path": (path_match.group(1) if path_match else ""),
+                "path": (path_match.group(1) if path_match else "src/ai_generated/generated_tool.ts"),
             }
         elif "brightness" in lower or "dim" in lower:
             tool_name = "control_brightness"
             num = re.search(r"(\d{1,3})", lower)
             args = {"level": max(0, min(100, int(num.group(1)))) if num else (0 if "dim" in lower else 50)}
+        elif "mute" in lower and "unmute" not in lower:
+            tool_name = "control_volume"
+            args = {"action": "mute"}
+        elif "unmute" in lower:
+            tool_name = "control_volume"
+            args = {"action": "unmute"}
         elif "volume" in lower:
             tool_name = "control_volume"
             num = re.search(r"(\d{1,3})", lower)
-            args = {"level": max(0, min(100, int(num.group(1)))) if num else 50}
+            if "up" in lower or "increase" in lower or "raise" in lower:
+                args = {"action": "up", "delta": max(1, min(50, int(num.group(1)))) if num else 10}
+            elif "down" in lower or "decrease" in lower or "lower" in lower:
+                args = {"action": "down", "delta": max(1, min(50, int(num.group(1)))) if num else 10}
+            else:
+                args = {"action": "set", "level": max(0, min(100, int(num.group(1)))) if num else 50}
 
         if not tool_name:
             return None
@@ -684,19 +773,48 @@ class AIBrain:
                 content = str(result.output.get("content", ""))
                 snippet = (content[:280] + "...") if len(content) > 280 else content
                 return f"Fetched page {result.output.get('url', '')}. {('Title: ' + title + '. ') if title else ''}{snippet}"
+            if tool_name == "search_web":
+                return f"Search results for '{result.output.get('query', '')}': {result.output.get('answer', '')}"
             if tool_name == "open_url":
                 return f"Opened {result.output.get('opened', '')} in your browser."
+            if tool_name == "display_image":
+                return f"Opened image: {result.output.get('opened', '')}."
+            if tool_name == "voice_modification":
+                return "Certainly. I have noted your voice preference. For a permanent backend voice change, set JARVIS_TTS_VOICE in .env and restart."
+            if tool_name == "screen_capture":
+                window = result.output.get("window", {})
+                title = (window or {}).get("window_title") if isinstance(window, dict) else None
+                return f"I inspected the active screen. Current window: {title or 'unknown'}"
             if tool_name == "ai_write_code":
                 return f"Code created at {result.output.get('path', 'src/')}"
+            if tool_name == "set_reminder":
+                return f"Certainly. Reminder set for {result.output.get('minutes')} minutes: {result.output.get('text')}"
+            if tool_name == "open_application":
+                return f"Opened {result.output.get('launched', 'the requested application')}."
+            if tool_name == "control_volume":
+                action = result.output.get("action", "set")
+                return f"Volume action completed: {action}."
+            if tool_name == "control_brightness":
+                return f"Brightness set to {result.output.get('level', 'requested level')}%."
+            if tool_name == "run_command":
+                rc = result.output.get("returncode")
+                return f"Command executed with return code {rc}."
             if tool_name == "manage_files":
                 op = str(result.output.get("action", "operation")).lower()
                 path = result.output.get("path", "")
+                dest = result.output.get("destination", "")
                 if op == "write":
                     return f"Created file at {path}."
+                if op == "append":
+                    return f"Appended content to {path}."
                 if op == "delete":
                     return f"Deleted {path}."
                 if op == "mkdir":
                     return f"Created directory {path}."
+                if op == "copy":
+                    return f"Copied {path} to {dest}."
+                if op == "move":
+                    return f"Moved {path} to {dest}."
                 if op == "list":
                     items = result.output.get("items", [])
                     preview = ", ".join(items[:8]) if isinstance(items, list) else ""
@@ -709,6 +827,9 @@ class AIBrain:
 
         if result.status == "requires_confirmation":
             return "This action needs your confirmation in the HUD popup before I can execute it."
+
+        if result.status == "denied" and str(result.output.get("reason", "")) == "tool_not_registered":
+            return "That specific tool is not available yet in this build. I can use registered tools such as system info, web search, open URL, app launch, command execution, file management, and screen inspection."
 
         return f"I couldn't execute {tool_name} right now: {result.output}."
 

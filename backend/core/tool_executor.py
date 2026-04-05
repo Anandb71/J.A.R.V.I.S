@@ -44,6 +44,7 @@ class ToolExecutor:
         self._aliases: dict[str, str] = {
             "get_screen_info": "system_info",
             "screen_info": "system_info",
+            "screen_capture": "screen_capture",
             "get_system_info": "system_info",
             "set_brightness": "control_brightness",
             "brightness": "control_brightness",
@@ -56,7 +57,11 @@ class ToolExecutor:
             "browse": "open_url",
             "open_website": "open_url",
             "visit_website": "open_url",
+            "image_display": "display_image",
+            "show_image": "display_image",
             "fetch_url": "fetch_webpage",
+            "voice_change": "voice_modification",
+            "set_voice": "voice_modification",
             "write_code": "ai_write_code",
             "create_code": "ai_write_code",
             "create_tool": "ai_write_code",
@@ -153,10 +158,13 @@ class ToolExecutor:
     async def _dispatch(self, tool_name: str, args: dict[str, Any]) -> ToolExecutionResult:
         handler = {
             "system_info": self._system_info,
+            "screen_capture": self._screen_capture,
             "open_application": self._open_application,
             "search_web": self._search_web,
             "fetch_webpage": self._fetch_webpage,
             "open_url": self._open_url,
+            "display_image": self._display_image,
+            "voice_modification": self._voice_modification,
             "set_reminder": self._set_reminder,
             "control_volume": self._control_volume,
             "control_brightness": self._control_brightness,
@@ -373,6 +381,82 @@ class ToolExecutor:
                 output={"error": str(exc), "url": url},
             )
 
+    async def _display_image(self, args: dict[str, Any]) -> ToolExecutionResult:
+        url = str(args.get("url", "")).strip()
+        path_value = str(args.get("path", "")).strip()
+
+        if url:
+            return await self._open_url({"url": url})
+
+        if not path_value:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="display_image",
+                output={"error": "Provide either url or path."},
+            )
+
+        try:
+            candidate = Path(path_value)
+            if not candidate.is_absolute():
+                candidate = (WORKSPACE_ROOT / candidate).resolve()
+            if not candidate.exists():
+                return ToolExecutionResult(
+                    status="error",
+                    tool_name="display_image",
+                    output={"error": f"Image path not found: {candidate}"},
+                )
+            subprocess.Popen(["cmd", "/c", "start", "", str(candidate)], shell=False)
+            return ToolExecutionResult(
+                status="ok",
+                tool_name="display_image",
+                output={"opened": str(candidate)},
+            )
+        except Exception as exc:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="display_image",
+                output={"error": str(exc)},
+            )
+
+    async def _screen_capture(self, args: dict[str, Any]) -> ToolExecutionResult:
+        max_depth = int(args.get("max_depth", 2) or 2)
+        max_nodes = int(args.get("max_nodes", 64) or 64)
+        max_depth = max(1, min(5, max_depth))
+        max_nodes = max(8, min(256, max_nodes))
+
+        try:
+            from backend.vision.manager import VisionManager  # local import to avoid heavy import at startup
+
+            vision = VisionManager.from_settings(self.settings)
+            snap = vision.inspect_active_window(max_depth=max_depth, max_nodes=max_nodes)
+            return ToolExecutionResult(
+                status="ok",
+                tool_name="screen_capture",
+                output={
+                    "window": snap.window,
+                    "capture": snap.capture,
+                },
+            )
+        except Exception as exc:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="screen_capture",
+                output={"error": f"Screen inspection failed: {exc}"},
+            )
+
+    async def _voice_modification(self, args: dict[str, Any]) -> ToolExecutionResult:
+        voice_type = str(args.get("voice_type", "British")).strip() or "British"
+        tone = str(args.get("tone", "formal")).strip() or "formal"
+        return ToolExecutionResult(
+            status="ok",
+            tool_name="voice_modification",
+            output={
+                "voice_type": voice_type,
+                "tone": tone,
+                "note": "Runtime voice profile acknowledged. To permanently change backend TTS voice, update JARVIS_TTS_VOICE in .env and restart.",
+            },
+        )
+
     async def _set_reminder(self, args: dict[str, Any]) -> ToolExecutionResult:
         text = str(args.get("text", "")).strip()
         minutes = int(args.get("minutes", 0) or 0)
@@ -389,18 +473,77 @@ class ToolExecutor:
         )
 
     async def _control_volume(self, args: dict[str, Any]) -> ToolExecutionResult:
-        level = int(args.get("level", -1) or -1)
-        if level < 0 or level > 100:
+        if platform.system().lower() != "windows":
+            return ToolExecutionResult(
+                status="error",
+                tool_name="control_volume",
+                output={"error": "Volume control is currently implemented for Windows only."},
+            )
+
+        action = str(args.get("action", "set") or "set").strip().lower()
+        delta = int(args.get("delta", 10) or 10)
+        delta = max(1, min(50, delta))
+        level_raw = args.get("level", None)
+
+        if action == "set" and level_raw is None:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="control_volume",
+                output={"error": "level is required when action is 'set'"},
+            )
+
+        level = int(level_raw) if level_raw is not None else -1
+        if action == "set" and (level < 0 or level > 100):
             return ToolExecutionResult(
                 status="error",
                 tool_name="control_volume",
                 output={"error": "level must be between 0 and 100"},
             )
-        return ToolExecutionResult(
-            status="ok",
-            tool_name="control_volume",
-            output={"level": level, "note": "Volume handler placeholder."},
-        )
+
+        try:
+            from pycaw.pycaw import AudioUtilities  # type: ignore
+
+            device = AudioUtilities.GetSpeakers()
+            volume = device.EndpointVolume
+
+            if action == "mute":
+                volume.SetMute(1, None)
+            elif action == "unmute":
+                volume.SetMute(0, None)
+            else:
+                current = float(volume.GetMasterVolumeLevelScalar())
+                if action == "set":
+                    target = max(0.0, min(1.0, level / 100.0))
+                elif action == "up":
+                    target = max(0.0, min(1.0, current + (delta / 100.0)))
+                elif action == "down":
+                    target = max(0.0, min(1.0, current - (delta / 100.0)))
+                else:
+                    return ToolExecutionResult(
+                        status="error",
+                        tool_name="control_volume",
+                        output={"error": f"Unsupported action: {action}"},
+                    )
+                volume.SetMasterVolumeLevelScalar(target, None)
+                volume.SetMute(0, None)
+
+            after = float(volume.GetMasterVolumeLevelScalar())
+            muted = bool(volume.GetMute())
+            return ToolExecutionResult(
+                status="ok",
+                tool_name="control_volume",
+                output={
+                    "action": action,
+                    "level": int(round(after * 100)),
+                    "muted": muted,
+                },
+            )
+        except Exception as exc:
+            return ToolExecutionResult(
+                status="error",
+                tool_name="control_volume",
+                output={"error": f"Volume command failed: {exc}"},
+            )
 
     async def _control_brightness(self, args: dict[str, Any]) -> ToolExecutionResult:
         level = int(args.get("level", -1) or -1)
@@ -503,12 +646,14 @@ class ToolExecutor:
                 output={"error": "Missing operation"},
             )
 
-        if action in {"list", "read", "write", "delete", "mkdir"} and not path_value:
+        if action in {"list", "read", "write", "delete", "mkdir", "append", "copy", "move"} and not path_value:
             return ToolExecutionResult(
                 status="error",
                 tool_name="manage_files",
                 output={"error": "Missing path"},
             )
+
+        destination = str(args.get("destination", "")).strip()
 
         def _resolve_safe_path(value: str) -> Path:
             candidate = Path(value)
@@ -552,6 +697,17 @@ class ToolExecutor:
                     output={"action": "write", "path": str(target), "bytes": len(content.encode("utf-8"))},
                 )
 
+            if action == "append":
+                target = _resolve_safe_path(path_value)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open("a", encoding="utf-8") as fh:
+                    fh.write(content)
+                return ToolExecutionResult(
+                    status="ok",
+                    tool_name="manage_files",
+                    output={"action": "append", "path": str(target), "bytes": len(content.encode("utf-8"))},
+                )
+
             if action == "delete":
                 target = _resolve_safe_path(path_value)
                 if target.is_dir():
@@ -573,6 +729,39 @@ class ToolExecutor:
                     status="ok",
                     tool_name="manage_files",
                     output={"action": "mkdir", "path": str(target)},
+                )
+
+            if action == "copy":
+                if not destination:
+                    raise ValueError("Missing destination")
+                source = _resolve_safe_path(path_value)
+                dest = _resolve_safe_path(destination)
+                if source.is_dir():
+                    import shutil
+                    if dest.exists() and dest.is_file():
+                        raise ValueError("Cannot copy directory onto file destination")
+                    shutil.copytree(source, dest, dirs_exist_ok=True)
+                else:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    import shutil
+                    shutil.copy2(source, dest)
+                return ToolExecutionResult(
+                    status="ok",
+                    tool_name="manage_files",
+                    output={"action": "copy", "path": str(source), "destination": str(dest)},
+                )
+
+            if action == "move":
+                if not destination:
+                    raise ValueError("Missing destination")
+                source = _resolve_safe_path(path_value)
+                dest = _resolve_safe_path(destination)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                source.rename(dest)
+                return ToolExecutionResult(
+                    status="ok",
+                    tool_name="manage_files",
+                    output={"action": "move", "path": str(source), "destination": str(dest)},
                 )
 
             return ToolExecutionResult(
