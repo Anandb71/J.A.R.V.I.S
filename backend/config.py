@@ -22,6 +22,7 @@ class Settings:
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
 
     tts_provider: str = os.getenv("JARVIS_TTS_PROVIDER", "edge")
+    tts_voice: str = os.getenv("JARVIS_TTS_VOICE", "en-GB-RyanNeural")
     stt_provider: str = os.getenv("JARVIS_STT_PROVIDER", "faster_whisper")
     wake_word_provider: str = os.getenv("JARVIS_WAKE_WORD_PROVIDER", "manual")
     wake_word_phrase: str = os.getenv("JARVIS_WAKE_WORD_PHRASE", "hey jarvis")

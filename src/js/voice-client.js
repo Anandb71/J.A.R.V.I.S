@@ -46,11 +46,11 @@ export class VoiceClient {
         stream: this.stream,
         onSpeechStart: () => this._onSpeechStart(),
         onSpeechEnd: (audio) => this._onSpeechEnd(audio),
-        positiveSpeechThreshold: 0.8,
-        negativeSpeechThreshold: 0.3,
-        redemptionFrames: 8,
+        positiveSpeechThreshold: 0.65,
+        negativeSpeechThreshold: 0.25,
+        redemptionFrames: 6,
         preSpeechPadFrames: 1,
-        minSpeechFrames: 3,
+        minSpeechFrames: 2,
       });
 
       this.vad.start();

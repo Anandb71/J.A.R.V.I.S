@@ -37,7 +37,7 @@ class DuplexVoicePipeline:
     CHANNELS = 1
     SAMPLE_WIDTH = 2  # 16-bit PCM
 
-    def __init__(self, brain, hub, websocket):
+    def __init__(self, brain, hub, websocket, tts_voice: str = "en-GB-RyanNeural"):
         """
         Initialize pipeline.
 
@@ -54,6 +54,7 @@ class DuplexVoicePipeline:
         self._current_task = None
         self._stt_model = None
         self.state = "idle"
+        self.tts_voice = tts_voice
 
     async def handle_audio_data(self, pcm_bytes: bytes):
         """
@@ -73,8 +74,8 @@ class DuplexVoicePipeline:
     async def handle_speech_end(self):
         """VAD endpoint — client says speech is done."""
         duration = len(self._audio_buffer) / (self.SAMPLE_RATE * self.SAMPLE_WIDTH)
-        # Require minimum 300ms of audio
-        if duration >= 0.3:
+        # Require minimum 180ms of audio to catch short utterances like "hello".
+        if duration >= 0.18:
             log.info("voice.speech_end", seconds=round(duration, 2))
             await self._process()
         else:
@@ -182,7 +183,13 @@ class DuplexVoicePipeline:
         if self._stt_model is None:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                from faster_whisper import WhisperModel
+                try:
+                    from faster_whisper import WhisperModel
+                except Exception as exc:
+                    raise RuntimeError(
+                        "Voice-to-text is unavailable because faster-whisper could not be imported. "
+                        "Install backend requirements and restart JARVIS."
+                    ) from exc
 
                 self._stt_model = WhisperModel(
                     "base", device="cpu", compute_type="int8"
@@ -208,10 +215,16 @@ class DuplexVoicePipeline:
         """
         try:
             # Import inside method to avoid hard dependency on edge-tts
-            from edge_tts import Communicate
+            try:
+                from edge_tts import Communicate
+            except Exception as exc:
+                raise RuntimeError(
+                    "JARVIS voice output is unavailable because edge-tts is missing. "
+                    "Install backend requirements and restart JARVIS."
+                ) from exc
 
-            communicate = Communicate(text=text, voice="en-US-AriaNeural")
-            log.info("voice.tts.start", chars=len(text))
+            communicate = Communicate(text=text, voice=self.tts_voice)
+            log.info("voice.tts.start", chars=len(text), voice=self.tts_voice)
 
             async with alatency("voice.tts"):
                 async for chunk in communicate.stream():
@@ -236,6 +249,11 @@ class DuplexVoicePipeline:
                 self.websocket,
                 BroadcastMessage(
                     event="voice:error",
-                    payload={"error": f"TTS failed: {str(e)}"},
+                    payload={
+                        "error": (
+                            f"TTS failed: {str(e)}. "
+                            "If this is an Edge TTS network issue, check internet access and try again."
+                        )
+                    },
                 )
             )

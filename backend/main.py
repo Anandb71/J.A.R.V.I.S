@@ -187,6 +187,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             brain=app.state.brain,
                             hub=hub,
                             websocket=websocket,
+                            tts_voice=settings.tts_voice,
                         )
                         app.state.duplex_pipelines[id(websocket)] = pipeline
                     await pipeline.handle_audio_data(audio_bytes)
