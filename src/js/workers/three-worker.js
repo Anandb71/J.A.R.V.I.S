@@ -6,6 +6,12 @@ const TIER_CONFIG = {
   low: { orb: 1500, ambient: 800, bloom: false, bloomStrength: 0, rings: 2, minFps: 24 },
 };
 
+const SUIT_BASE_X = 2.9;
+const SUIT_BASE_Y = -1.04;
+const SUIT_BASE_Z = -0.24;
+const SUIT_BASE_ROT_Y = -0.28;
+const SUIT_BASE_SCALE = 1.2;
+
 let renderer;
 let scene;
 let camera;
@@ -217,19 +223,23 @@ function makeArmorMaterial(colorHex = 0x7b1f35) {
 
 function buildSuitAvatar() {
   suitGroup = new THREE.Group();
-  suitGroup.position.set(3.45, -1.15, -0.35);
-  suitGroup.rotation.y = -0.38;
-  suitGroup.scale.setScalar(1.12);
+  suitGroup.position.set(SUIT_BASE_X, SUIT_BASE_Y, SUIT_BASE_Z);
+  suitGroup.rotation.y = SUIT_BASE_ROT_Y;
+  suitGroup.scale.setScalar(SUIT_BASE_SCALE);
 
   const frame = new THREE.Group();
 
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.35, 0.52), makeArmorMaterial(0x7a1f34));
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.35, 0.52), makeArmorMaterial(0xb0182c));
   torso.position.y = 0.45;
   frame.add(torso);
 
-  const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.88, 0.12), makeArmorMaterial(0x8f253f));
+  const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.88, 0.12), makeArmorMaterial(0xcaa233));
   chestPlate.position.set(0, 0.46, 0.31);
   frame.add(chestPlate);
+
+  const chestRim = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.96, 0.07), makeArmorMaterial(0x7f1524));
+  chestRim.position.set(0, 0.46, 0.25);
+  frame.add(chestRim);
 
   suitCore = new THREE.Mesh(
     new THREE.CylinderGeometry(0.135, 0.135, 0.09, 24),
@@ -245,74 +255,78 @@ function buildSuitAvatar() {
   suitCore.position.set(0, 0.46, 0.39);
   frame.add(suitCore);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.265, 24, 20), makeArmorMaterial(0x8c243f));
-  head.position.set(0, 1.37, 0.02);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.42, 0.42), makeArmorMaterial(0xaf162a));
+  head.position.set(0, 1.35, 0.03);
   frame.add(head);
 
+  const facePlate = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.3, 0.09), makeArmorMaterial(0xd3ab3b));
+  facePlate.position.set(0, 1.34, 0.24);
+  frame.add(facePlate);
+
   suitVisor = new THREE.Mesh(
-    new THREE.BoxGeometry(0.24, 0.07, 0.08),
+    new THREE.BoxGeometry(0.23, 0.045, 0.07),
     new THREE.MeshStandardMaterial({
-      color: 0x92dcff,
-      emissive: 0x6bd6ff,
-      emissiveIntensity: 1.2,
+      color: 0xbceeff,
+      emissive: 0x89e7ff,
+      emissiveIntensity: 1.45,
       metalness: 0.2,
       roughness: 0.08,
     }),
   );
-  suitVisor.position.set(0, 1.41, 0.23);
+  suitVisor.position.set(0, 1.38, 0.28);
   frame.add(suitVisor);
 
-  const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), makeArmorMaterial(0x7b1f35));
+  const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), makeArmorMaterial(0xb0182c));
   shoulderL.position.set(-0.57, 0.98, 0.03);
   frame.add(shoulderL);
 
-  const shoulderR = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), makeArmorMaterial(0x7b1f35));
+  const shoulderR = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), makeArmorMaterial(0xb0182c));
   shoulderR.position.set(0.57, 0.98, 0.03);
   frame.add(shoulderR);
 
   const upperArmGeo = new THREE.CapsuleGeometry(0.105, 0.45, 6, 12);
   const lowerArmGeo = new THREE.CapsuleGeometry(0.09, 0.4, 6, 12);
 
-  const upperArmL = new THREE.Mesh(upperArmGeo, makeArmorMaterial(0x7b1f35));
+  const upperArmL = new THREE.Mesh(upperArmGeo, makeArmorMaterial(0xaf162a));
   upperArmL.position.set(-0.69, 0.66, 0.03);
   upperArmL.rotation.z = 0.22;
   frame.add(upperArmL);
 
-  const upperArmR = new THREE.Mesh(upperArmGeo, makeArmorMaterial(0x7b1f35));
+  const upperArmR = new THREE.Mesh(upperArmGeo, makeArmorMaterial(0xaf162a));
   upperArmR.position.set(0.69, 0.66, 0.03);
   upperArmR.rotation.z = -0.22;
   frame.add(upperArmR);
 
-  const lowerArmL = new THREE.Mesh(lowerArmGeo, makeArmorMaterial(0x8f253f));
+  const lowerArmL = new THREE.Mesh(lowerArmGeo, makeArmorMaterial(0xd3ab3b));
   lowerArmL.position.set(-0.77, 0.24, 0.06);
   lowerArmL.rotation.z = 0.14;
   frame.add(lowerArmL);
 
-  const lowerArmR = new THREE.Mesh(lowerArmGeo, makeArmorMaterial(0x8f253f));
+  const lowerArmR = new THREE.Mesh(lowerArmGeo, makeArmorMaterial(0xd3ab3b));
   lowerArmR.position.set(0.77, 0.24, 0.06);
   lowerArmR.rotation.z = -0.14;
   frame.add(lowerArmR);
 
-  const hip = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.38, 0.42), makeArmorMaterial(0x6e1a30));
+  const hip = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.38, 0.42), makeArmorMaterial(0x8f1422));
   hip.position.set(0, -0.46, 0.0);
   frame.add(hip);
 
   const thighGeo = new THREE.CapsuleGeometry(0.145, 0.58, 6, 12);
   const shinGeo = new THREE.CapsuleGeometry(0.11, 0.52, 6, 12);
 
-  const thighL = new THREE.Mesh(thighGeo, makeArmorMaterial(0x87213a));
+  const thighL = new THREE.Mesh(thighGeo, makeArmorMaterial(0xaf162a));
   thighL.position.set(-0.24, -0.95, 0.02);
   frame.add(thighL);
 
-  const thighR = new THREE.Mesh(thighGeo, makeArmorMaterial(0x87213a));
+  const thighR = new THREE.Mesh(thighGeo, makeArmorMaterial(0xaf162a));
   thighR.position.set(0.24, -0.95, 0.02);
   frame.add(thighR);
 
-  const shinL = new THREE.Mesh(shinGeo, makeArmorMaterial(0x9a2a46));
+  const shinL = new THREE.Mesh(shinGeo, makeArmorMaterial(0xd3ab3b));
   shinL.position.set(-0.24, -1.58, 0.07);
   frame.add(shinL);
 
-  const shinR = new THREE.Mesh(shinGeo, makeArmorMaterial(0x9a2a46));
+  const shinR = new THREE.Mesh(shinGeo, makeArmorMaterial(0xd3ab3b));
   shinR.position.set(0.24, -1.58, 0.07);
   frame.add(shinR);
 
@@ -323,7 +337,7 @@ function buildSuitAvatar() {
   base.position.set(0, -2.0, -0.08);
   frame.add(base);
 
-  const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.35, 4.05, 0.9));
+  const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.45, 4.15, 0.95));
   suitOutline = new THREE.LineSegments(
     edgeGeo,
     new THREE.LineBasicMaterial({ color: 0x3bbaff, transparent: true, opacity: 0.24 }),
@@ -442,15 +456,15 @@ function render(now) {
   if (suitGroup) {
     const stressPulse = 1 + Math.sin(time * (1.6 + stressLevel * 3.2)) * 0.018;
     const breathing = 1 + Math.sin(time * 1.45) * 0.012;
-    suitGroup.scale.setScalar(1.12 * stressPulse * breathing);
-    suitGroup.rotation.y = -0.38 + Math.sin(time * 0.48) * 0.045;
+    suitGroup.scale.setScalar(SUIT_BASE_SCALE * stressPulse * breathing);
+    suitGroup.rotation.y = SUIT_BASE_ROT_Y + Math.sin(time * 0.48) * 0.045;
 
     if (state === 'thinking') {
       suitGroup.rotation.z = Math.sin(time * 1.2) * 0.015;
     } else if (state === 'speaking') {
-      suitGroup.position.y = -1.15 + Math.sin(time * 2.2) * 0.035;
+      suitGroup.position.y = SUIT_BASE_Y + Math.sin(time * 2.2) * 0.035;
     } else {
-      suitGroup.position.y += (-1.15 - suitGroup.position.y) * 0.12;
+      suitGroup.position.y += (SUIT_BASE_Y - suitGroup.position.y) * 0.12;
       suitGroup.rotation.z *= 0.9;
     }
 
