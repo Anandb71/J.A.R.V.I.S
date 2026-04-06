@@ -11,7 +11,6 @@ const SUIT_BASE_Y = -1.04;
 const SUIT_BASE_Z = -0.24;
 const SUIT_BASE_ROT_Y = -0.28;
 const SUIT_BASE_SCALE = 1.2;
-const HELMET_ASSET_URL = new URL('../../assets/iron-mask.svg', import.meta.url).href;
 
 let renderer;
 let scene;
@@ -27,8 +26,6 @@ let suitCore;
 let suitVisor;
 let suitOutline;
 let suitArmorMaterials = [];
-let suitMaskPlane;
-let suitMaskMaterial;
 let state = 'idle';
 let audioLevel = 0;
 let stressLevel = 0;
@@ -224,102 +221,28 @@ function makeArmorMaterial(colorHex = 0x7b1f35) {
   return material;
 }
 
-function createFallbackHelmetTexture() {
-  const canvas = new OffscreenCanvas(512, 512);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    const tiny = new OffscreenCanvas(2, 2);
-    return new THREE.CanvasTexture(tiny);
-  }
-  ctx.clearRect(0, 0, 512, 512);
-  ctx.strokeStyle = '#c8f1ff';
-  ctx.lineWidth = 12;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-
-  ctx.beginPath();
-  ctx.moveTo(126, 96);
-  ctx.lineTo(186, 52);
-  ctx.lineTo(326, 52);
-  ctx.lineTo(386, 96);
-  ctx.lineTo(368, 284);
-  ctx.lineTo(304, 382);
-  ctx.lineTo(208, 382);
-  ctx.lineTo(144, 284);
-  ctx.closePath();
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(176, 220);
-  ctx.lineTo(232, 210);
-  ctx.moveTo(336, 220);
-  ctx.lineTo(280, 210);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(184, 336);
-  ctx.lineTo(228, 304);
-  ctx.lineTo(284, 304);
-  ctx.lineTo(328, 336);
-  ctx.stroke();
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-function loadHelmetTexture(url) {
-  return new Promise((resolve, reject) => {
-    const loader = new THREE.ImageBitmapLoader();
-    loader.load(
-      url,
-      (imageBitmap) => {
-        const texture = new THREE.Texture(imageBitmap);
-        texture.needsUpdate = true;
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.flipY = false;
-        resolve(texture);
-      },
-      undefined,
-      reject,
-    );
-  });
-}
-
 function buildSuitAvatar() {
   suitGroup = new THREE.Group();
   suitGroup.position.set(SUIT_BASE_X, SUIT_BASE_Y, SUIT_BASE_Z);
   suitGroup.rotation.y = SUIT_BASE_ROT_Y;
   suitGroup.scale.setScalar(SUIT_BASE_SCALE);
 
-  const plate = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.75, 2.2),
-    new THREE.MeshBasicMaterial({
-      color: 0x08192a,
-      transparent: true,
-      opacity: 0.52,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    }),
-  );
-  plate.position.set(0, 0.42, -0.02);
-  suitGroup.add(plate);
+  const frame = new THREE.Group();
 
-  suitMaskMaterial = new THREE.MeshBasicMaterial({
-    map: createFallbackHelmetTexture(),
-    color: 0xff3a5c,
-    transparent: true,
-    opacity: 0.88,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-  suitMaskPlane = new THREE.Mesh(new THREE.PlaneGeometry(1.48, 1.48), suitMaskMaterial);
-  suitMaskPlane.position.set(0, 0.63, 0.04);
-  suitGroup.add(suitMaskPlane);
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.35, 0.52), makeArmorMaterial(0xb0182c));
+  torso.position.y = 0.45;
+  frame.add(torso);
+
+  const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.88, 0.12), makeArmorMaterial(0xcaa233));
+  chestPlate.position.set(0, 0.46, 0.31);
+  frame.add(chestPlate);
+
+  const chestRim = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.96, 0.07), makeArmorMaterial(0x7f1524));
+  chestRim.position.set(0, 0.46, 0.25);
+  frame.add(chestRim);
 
   suitCore = new THREE.Mesh(
-    new THREE.RingGeometry(0.09, 0.135, 24),
+    new THREE.CylinderGeometry(0.135, 0.135, 0.09, 24),
     new THREE.MeshStandardMaterial({
       color: 0x67d3ff,
       emissive: 0x24b6ff,
@@ -328,11 +251,20 @@ function buildSuitAvatar() {
       roughness: 0.15,
     }),
   );
-  suitCore.position.set(0, -0.12, 0.03);
-  suitGroup.add(suitCore);
+  suitCore.rotation.x = Math.PI / 2;
+  suitCore.position.set(0, 0.46, 0.39);
+  frame.add(suitCore);
+
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.42, 0.42), makeArmorMaterial(0xaf162a));
+  head.position.set(0, 1.35, 0.03);
+  frame.add(head);
+
+  const facePlate = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.3, 0.09), makeArmorMaterial(0xd3ab3b));
+  facePlate.position.set(0, 1.34, 0.24);
+  frame.add(facePlate);
 
   suitVisor = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.34, 0.05),
+    new THREE.BoxGeometry(0.23, 0.045, 0.07),
     new THREE.MeshStandardMaterial({
       color: 0xbceeff,
       emissive: 0x89e7ff,
@@ -341,28 +273,80 @@ function buildSuitAvatar() {
       roughness: 0.08,
     }),
   );
-  suitVisor.position.set(0, 0.8, 0.055);
-  suitGroup.add(suitVisor);
+  suitVisor.position.set(0, 1.38, 0.28);
+  frame.add(suitVisor);
 
-  const edgeGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.75, 2.2));
+  const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), makeArmorMaterial(0xb0182c));
+  shoulderL.position.set(-0.57, 0.98, 0.03);
+  frame.add(shoulderL);
+
+  const shoulderR = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), makeArmorMaterial(0xb0182c));
+  shoulderR.position.set(0.57, 0.98, 0.03);
+  frame.add(shoulderR);
+
+  const upperArmGeo = new THREE.CapsuleGeometry(0.105, 0.45, 6, 12);
+  const lowerArmGeo = new THREE.CapsuleGeometry(0.09, 0.4, 6, 12);
+
+  const upperArmL = new THREE.Mesh(upperArmGeo, makeArmorMaterial(0xaf162a));
+  upperArmL.position.set(-0.69, 0.66, 0.03);
+  upperArmL.rotation.z = 0.22;
+  frame.add(upperArmL);
+
+  const upperArmR = new THREE.Mesh(upperArmGeo, makeArmorMaterial(0xaf162a));
+  upperArmR.position.set(0.69, 0.66, 0.03);
+  upperArmR.rotation.z = -0.22;
+  frame.add(upperArmR);
+
+  const lowerArmL = new THREE.Mesh(lowerArmGeo, makeArmorMaterial(0xd3ab3b));
+  lowerArmL.position.set(-0.77, 0.24, 0.06);
+  lowerArmL.rotation.z = 0.14;
+  frame.add(lowerArmL);
+
+  const lowerArmR = new THREE.Mesh(lowerArmGeo, makeArmorMaterial(0xd3ab3b));
+  lowerArmR.position.set(0.77, 0.24, 0.06);
+  lowerArmR.rotation.z = -0.14;
+  frame.add(lowerArmR);
+
+  const hip = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.38, 0.42), makeArmorMaterial(0x8f1422));
+  hip.position.set(0, -0.46, 0.0);
+  frame.add(hip);
+
+  const thighGeo = new THREE.CapsuleGeometry(0.145, 0.58, 6, 12);
+  const shinGeo = new THREE.CapsuleGeometry(0.11, 0.52, 6, 12);
+
+  const thighL = new THREE.Mesh(thighGeo, makeArmorMaterial(0xaf162a));
+  thighL.position.set(-0.24, -0.95, 0.02);
+  frame.add(thighL);
+
+  const thighR = new THREE.Mesh(thighGeo, makeArmorMaterial(0xaf162a));
+  thighR.position.set(0.24, -0.95, 0.02);
+  frame.add(thighR);
+
+  const shinL = new THREE.Mesh(shinGeo, makeArmorMaterial(0xd3ab3b));
+  shinL.position.set(-0.24, -1.58, 0.07);
+  frame.add(shinL);
+
+  const shinR = new THREE.Mesh(shinGeo, makeArmorMaterial(0xd3ab3b));
+  shinR.position.set(0.24, -1.58, 0.07);
+  frame.add(shinR);
+
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.98, 1.08, 0.1, 34),
+    new THREE.MeshBasicMaterial({ color: 0x1b3852, transparent: true, opacity: 0.4 }),
+  );
+  base.position.set(0, -2.0, -0.08);
+  frame.add(base);
+
+  const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.45, 4.15, 0.95));
   suitOutline = new THREE.LineSegments(
     edgeGeo,
     new THREE.LineBasicMaterial({ color: 0x3bbaff, transparent: true, opacity: 0.24 }),
   );
-  suitOutline.position.set(0, 0.42, 0.06);
+  suitOutline.position.y = -0.2;
+
+  suitGroup.add(frame);
   suitGroup.add(suitOutline);
   scene.add(suitGroup);
-
-  loadHelmetTexture(HELMET_ASSET_URL)
-    .then((tex) => {
-      if (!suitMaskMaterial) return;
-      if (suitMaskMaterial.map) suitMaskMaterial.map.dispose();
-      suitMaskMaterial.map = tex;
-      suitMaskMaterial.needsUpdate = true;
-    })
-    .catch(() => {
-      // Fallback texture is already applied.
-    });
 }
 
 function rebuild(nextTier) {
@@ -500,17 +484,6 @@ function render(now) {
       suitVisor.material.color.copy(blended.clone().lerp(new THREE.Color('#ffffff'), 0.18));
       suitVisor.material.emissive.copy(blended);
       suitVisor.material.emissiveIntensity = 0.9 + stressLevel * 0.9;
-    }
-
-    if (suitMaskMaterial) {
-      const maskColor = new THREE.Color('#ff3a5c').lerp(new THREE.Color('#ffd266'), Math.min(1, stressLevel * 0.55));
-      suitMaskMaterial.color.copy(maskColor);
-      suitMaskMaterial.opacity = 0.72 + audioLevel * 0.22 + stressLevel * 0.14;
-    }
-
-    if (suitMaskPlane) {
-      suitMaskPlane.rotation.z = Math.sin(time * 0.9) * 0.04;
-      suitMaskPlane.scale.setScalar(1 + audioLevel * 0.05 + stressLevel * 0.04);
     }
 
     suitArmorMaterials.forEach((material, idx) => {
