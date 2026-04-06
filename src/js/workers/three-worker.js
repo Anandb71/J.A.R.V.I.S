@@ -19,13 +19,6 @@ let orb;
 let halo;
 let rings = [];
 let ambient;
-let sceneAmbientLight;
-let sceneKeyLight;
-let suitGroup;
-let suitCore;
-let suitVisor;
-let suitOutline;
-let suitArmorMaterials = [];
 let state = 'idle';
 let audioLevel = 0;
 let stressLevel = 0;
@@ -81,7 +74,7 @@ async function init(message) {
   scene.fog = new THREE.Fog(0x050814, 6, 28);
 
   camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-  camera.position.set(0.35, 0.1, 9.3);
+  camera.position.set(0, 0, 9);
 
   buildScene();
   postMessage({ type: 'ready' });
@@ -92,14 +85,6 @@ function buildScene() {
   scene.clear();
   rings.forEach((ring) => scene.remove(ring));
   rings = [];
-  suitArmorMaterials = [];
-
-  sceneAmbientLight = new THREE.AmbientLight(0x86a8c9, 0.45);
-  scene.add(sceneAmbientLight);
-
-  sceneKeyLight = new THREE.DirectionalLight(0x8cc8ff, 0.9);
-  sceneKeyLight.position.set(4.5, 6.5, 8.5);
-  scene.add(sceneKeyLight);
 
   const orbGeometry = new THREE.BufferGeometry();
   const positions = new Float32Array(config.orb * 3);
@@ -205,148 +190,6 @@ function buildScene() {
   ambGeometry.setAttribute('position', new THREE.BufferAttribute(ambPositions, 3));
   ambient = new THREE.Points(ambGeometry, new THREE.PointsMaterial({ color: 0x7dcfff, size: 0.02, transparent: true, opacity: 0.6 }));
   scene.add(ambient);
-
-  buildSuitAvatar();
-}
-
-function makeArmorMaterial(colorHex = 0x7b1f35) {
-  const material = new THREE.MeshStandardMaterial({
-    color: colorHex,
-    metalness: 0.78,
-    roughness: 0.36,
-    emissive: 0x18070d,
-    emissiveIntensity: 0.25,
-  });
-  suitArmorMaterials.push(material);
-  return material;
-}
-
-function buildSuitAvatar() {
-  suitGroup = new THREE.Group();
-  suitGroup.position.set(SUIT_BASE_X, SUIT_BASE_Y, SUIT_BASE_Z);
-  suitGroup.rotation.y = SUIT_BASE_ROT_Y;
-  suitGroup.scale.setScalar(SUIT_BASE_SCALE);
-
-  const frame = new THREE.Group();
-
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.35, 0.52), makeArmorMaterial(0xb0182c));
-  torso.position.y = 0.45;
-  frame.add(torso);
-
-  const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.88, 0.12), makeArmorMaterial(0xcaa233));
-  chestPlate.position.set(0, 0.46, 0.31);
-  frame.add(chestPlate);
-
-  const chestRim = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.96, 0.07), makeArmorMaterial(0x7f1524));
-  chestRim.position.set(0, 0.46, 0.25);
-  frame.add(chestRim);
-
-  suitCore = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.135, 0.135, 0.09, 24),
-    new THREE.MeshStandardMaterial({
-      color: 0x67d3ff,
-      emissive: 0x24b6ff,
-      emissiveIntensity: 1.8,
-      metalness: 0.25,
-      roughness: 0.15,
-    }),
-  );
-  suitCore.rotation.x = Math.PI / 2;
-  suitCore.position.set(0, 0.46, 0.39);
-  frame.add(suitCore);
-
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.42, 0.42), makeArmorMaterial(0xaf162a));
-  head.position.set(0, 1.35, 0.03);
-  frame.add(head);
-
-  const facePlate = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.3, 0.09), makeArmorMaterial(0xd3ab3b));
-  facePlate.position.set(0, 1.34, 0.24);
-  frame.add(facePlate);
-
-  suitVisor = new THREE.Mesh(
-    new THREE.BoxGeometry(0.23, 0.045, 0.07),
-    new THREE.MeshStandardMaterial({
-      color: 0xbceeff,
-      emissive: 0x89e7ff,
-      emissiveIntensity: 1.45,
-      metalness: 0.2,
-      roughness: 0.08,
-    }),
-  );
-  suitVisor.position.set(0, 1.38, 0.28);
-  frame.add(suitVisor);
-
-  const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), makeArmorMaterial(0xb0182c));
-  shoulderL.position.set(-0.57, 0.98, 0.03);
-  frame.add(shoulderL);
-
-  const shoulderR = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), makeArmorMaterial(0xb0182c));
-  shoulderR.position.set(0.57, 0.98, 0.03);
-  frame.add(shoulderR);
-
-  const upperArmGeo = new THREE.CapsuleGeometry(0.105, 0.45, 6, 12);
-  const lowerArmGeo = new THREE.CapsuleGeometry(0.09, 0.4, 6, 12);
-
-  const upperArmL = new THREE.Mesh(upperArmGeo, makeArmorMaterial(0xaf162a));
-  upperArmL.position.set(-0.69, 0.66, 0.03);
-  upperArmL.rotation.z = 0.22;
-  frame.add(upperArmL);
-
-  const upperArmR = new THREE.Mesh(upperArmGeo, makeArmorMaterial(0xaf162a));
-  upperArmR.position.set(0.69, 0.66, 0.03);
-  upperArmR.rotation.z = -0.22;
-  frame.add(upperArmR);
-
-  const lowerArmL = new THREE.Mesh(lowerArmGeo, makeArmorMaterial(0xd3ab3b));
-  lowerArmL.position.set(-0.77, 0.24, 0.06);
-  lowerArmL.rotation.z = 0.14;
-  frame.add(lowerArmL);
-
-  const lowerArmR = new THREE.Mesh(lowerArmGeo, makeArmorMaterial(0xd3ab3b));
-  lowerArmR.position.set(0.77, 0.24, 0.06);
-  lowerArmR.rotation.z = -0.14;
-  frame.add(lowerArmR);
-
-  const hip = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.38, 0.42), makeArmorMaterial(0x8f1422));
-  hip.position.set(0, -0.46, 0.0);
-  frame.add(hip);
-
-  const thighGeo = new THREE.CapsuleGeometry(0.145, 0.58, 6, 12);
-  const shinGeo = new THREE.CapsuleGeometry(0.11, 0.52, 6, 12);
-
-  const thighL = new THREE.Mesh(thighGeo, makeArmorMaterial(0xaf162a));
-  thighL.position.set(-0.24, -0.95, 0.02);
-  frame.add(thighL);
-
-  const thighR = new THREE.Mesh(thighGeo, makeArmorMaterial(0xaf162a));
-  thighR.position.set(0.24, -0.95, 0.02);
-  frame.add(thighR);
-
-  const shinL = new THREE.Mesh(shinGeo, makeArmorMaterial(0xd3ab3b));
-  shinL.position.set(-0.24, -1.58, 0.07);
-  frame.add(shinL);
-
-  const shinR = new THREE.Mesh(shinGeo, makeArmorMaterial(0xd3ab3b));
-  shinR.position.set(0.24, -1.58, 0.07);
-  frame.add(shinR);
-
-  const base = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.98, 1.08, 0.1, 34),
-    new THREE.MeshBasicMaterial({ color: 0x1b3852, transparent: true, opacity: 0.4 }),
-  );
-  base.position.set(0, -2.0, -0.08);
-  frame.add(base);
-
-  const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.45, 4.15, 0.95));
-  suitOutline = new THREE.LineSegments(
-    edgeGeo,
-    new THREE.LineBasicMaterial({ color: 0x3bbaff, transparent: true, opacity: 0.24 }),
-  );
-  suitOutline.position.y = -0.2;
-
-  suitGroup.add(frame);
-  suitGroup.add(suitOutline);
-  scene.add(suitGroup);
 }
 
 function rebuild(nextTier) {
@@ -451,51 +294,6 @@ function render(now) {
   if (halo) {
     halo.rotation.y += 0.0012;
     halo.scale.setScalar(1.0 + audioLevel * 0.06);
-  }
-
-  if (suitGroup) {
-    const stressPulse = 1 + Math.sin(time * (1.6 + stressLevel * 3.2)) * 0.018;
-    const breathing = 1 + Math.sin(time * 1.45) * 0.012;
-    suitGroup.scale.setScalar(SUIT_BASE_SCALE * stressPulse * breathing);
-    suitGroup.rotation.y = SUIT_BASE_ROT_Y + Math.sin(time * 0.48) * 0.045;
-
-    if (state === 'thinking') {
-      suitGroup.rotation.z = Math.sin(time * 1.2) * 0.015;
-    } else if (state === 'speaking') {
-      suitGroup.position.y = SUIT_BASE_Y + Math.sin(time * 2.2) * 0.035;
-    } else {
-      suitGroup.position.y += (SUIT_BASE_Y - suitGroup.position.y) * 0.12;
-      suitGroup.rotation.z *= 0.9;
-    }
-
-    const alertColor = new THREE.Color('#ff335c');
-    const calmColor = new THREE.Color('#3bbaff');
-    const blended = calmColor.clone().lerp(alertColor, Math.min(1, stressLevel * 1.25));
-
-    if (suitCore?.material) {
-      suitCore.material.color.copy(blended);
-      suitCore.material.emissive.copy(blended);
-      suitCore.material.emissiveIntensity = 1.25 + stressLevel * 1.8 + audioLevel * 0.4;
-      suitCore.scale.setScalar(1 + audioLevel * 0.11 + stressLevel * 0.08);
-      suitCore.rotation.z += 0.02 + stressLevel * 0.05;
-    }
-
-    if (suitVisor?.material) {
-      suitVisor.material.color.copy(blended.clone().lerp(new THREE.Color('#ffffff'), 0.18));
-      suitVisor.material.emissive.copy(blended);
-      suitVisor.material.emissiveIntensity = 0.9 + stressLevel * 0.9;
-    }
-
-    suitArmorMaterials.forEach((material, idx) => {
-      material.emissive.copy(blended.clone().multiplyScalar(0.18 + idx * 0.002));
-      material.emissiveIntensity = 0.16 + stressLevel * 0.5;
-      material.roughness = 0.36 + stressLevel * 0.16;
-    });
-
-    if (suitOutline?.material) {
-      suitOutline.material.color.copy(blended);
-      suitOutline.material.opacity = 0.16 + stressLevel * 0.3;
-    }
   }
 
   renderer.render(scene, camera);
