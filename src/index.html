@@ -30,9 +30,15 @@
         </div>
 
         <div class="top-right">
+          <span id="mode-status" class="status-pill" style="font-size:10px">MODE: NORMAL</span>
           <span id="top-weather" class="status-pill" style="font-size:10px">☀ --°C</span>
           <span id="top-battery" class="status-pill" style="font-size:10px">⚡ --%</span>
           <div id="backend-status" class="status-pill warn">Backend: starting…</div>
+          <div id="health-matrix" class="health-matrix" aria-label="Health matrix">
+            <div class="health-item"><span id="hm-ui" class="health-dot warn"></span><span>UI</span></div>
+            <div class="health-item"><span id="hm-api" class="health-dot warn"></span><span>API</span></div>
+            <div class="health-item"><span id="hm-ai" class="health-dot warn"></span><span>AI</span></div>
+          </div>
         </div>
       </header>
 
@@ -42,6 +48,7 @@
           <h2>⚙ System</h2>
           <button id="btn-collapse-left" class="panel-collapse-btn" aria-label="Collapse system panel">◀</button>
         </div>
+        <p class="panel-subtitle">Realtime diagnostics and performance telemetry</p>
         <div class="gauges-grid">
           <div class="gauge-card">
             <canvas id="cpu-gauge" width="140" height="140"></canvas>
@@ -56,17 +63,24 @@
             <canvas id="net-gauge" width="140" height="140"></canvas>
           </div>
         </div>
-        <div id="sys-details" style="margin-top:8px; font-size:10px; color:var(--text-muted); font-family:'Cascadia Mono','Consolas',monospace; padding: 4px;">
+        <div id="sys-details" class="sys-details">
           <div id="sys-ram-detail">RAM: --/-- GB</div>
           <div id="sys-gpu-name">GPU: --</div>
           <div id="sys-disk">Disk: --%</div>
           <div id="sys-net-detail">↑ 0 KB/s  ↓ 0 KB/s</div>
         </div>
+        <div class="panel-footer-note">AUTONOMY: ADAPTIVE · SAFETY: ENFORCED</div>
       </aside>
 
       <!-- ── Center: Three.js Canvas ── -->
       <main class="hud-panel center-panel">
         <canvas id="three-canvas" class="three-canvas"></canvas>
+        <div class="center-grid-overlay"></div>
+        <div class="center-hud-rings" aria-hidden="true">
+          <span class="ring ring-a"></span>
+          <span class="ring ring-b"></span>
+          <span class="ring ring-c"></span>
+        </div>
         <div class="orb-wrap">
           <div class="orb-ring"></div>
           <p class="orb-label">JARVIS Core</p>
@@ -80,6 +94,11 @@
           <h2>💬 Comms</h2>
           <button id="btn-collapse-right" class="panel-collapse-btn" aria-label="Collapse comms panel">▶</button>
         </div>
+        <div class="comms-strip">
+          <span class="comms-chip">Live</span>
+          <span class="comms-chip">Low Latency</span>
+          <span class="comms-chip">Secure Link</span>
+        </div>
         <div id="chat-panel" class="chat-panel"></div>
         <div class="chat-input-wrap">
           <input id="chat-input" type="text" placeholder="Message JARVIS…" autocomplete="off" />
@@ -89,11 +108,15 @@
 
       <!-- ── Bottom Bar ── -->
       <footer class="hud-panel bottom-bar">
-        <button id="btn-mic" class="hud-btn">🎤 Voice</button>
-        <button id="btn-toggle-voice-reply" class="hud-btn primary">🔊 Voice Reply: ON</button>
+        <div class="bottom-controls">
+          <button id="btn-mic" class="hud-btn">🎤 Voice</button>
+          <button id="btn-toggle-voice-reply" class="hud-btn primary">🔊 Voice Reply: ON</button>
+        </div>
         <div class="separator"></div>
-        <button id="btn-toggle-clickthrough" class="hud-btn">🖱 Click-through</button>
-        <button id="btn-toggle-hud" class="hud-btn">👁 Focus</button>
+        <div class="bottom-controls">
+          <button id="btn-toggle-clickthrough" class="hud-btn">🖱 Click-through</button>
+          <button id="btn-toggle-hud" class="hud-btn">👁 Focus</button>
+        </div>
         <div class="separator"></div>
         <div class="bottom-info">
           <span id="ws-status">WS: ●</span>
