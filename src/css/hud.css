@@ -118,6 +118,24 @@
   color: #bfe6ff;
 }
 
+.top-ticks {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 2px;
+  padding: 5px 8px;
+  border: 1px solid rgba(95, 177, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(5, 20, 34, 0.45);
+}
+
+.top-ticks span {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: #7ea3c2;
+  font-family: 'Cascadia Mono', 'Consolas', monospace;
+}
+
 .top-right {
   display: flex;
   align-items: center;
@@ -292,6 +310,36 @@
   letter-spacing: 0.1em;
 }
 
+.diag-bars {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.diag-bar {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  align-items: center;
+  gap: 7px;
+}
+
+.diag-bar span {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: #6f91ad;
+  text-transform: uppercase;
+}
+
+.diag-bar i {
+  display: block;
+  height: 7px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(53, 186, 255, 0.85) 0 var(--p), rgba(35, 61, 84, 0.55) var(--p) 100%);
+  border: 1px solid rgba(86, 171, 233, 0.24);
+  box-shadow: inset 0 0 10px rgba(12, 121, 191, 0.2);
+}
+
 /* ── Center Panel: Reactor Stage ─────────────────────────────── */
 .center-panel {
   min-height: 200px;
@@ -363,6 +411,52 @@
   width: 430px;
   height: 430px;
   border-color: rgba(84, 179, 255, 0.12);
+}
+
+.reactor-data-arcs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+}
+
+.reactor-data-arcs .arc {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+
+.reactor-data-arcs .arc-1 {
+  width: 210px;
+  height: 210px;
+  border-top-color: rgba(110, 206, 255, 0.72);
+  border-right-color: rgba(110, 206, 255, 0.2);
+  transform: rotate(22deg);
+}
+
+.reactor-data-arcs .arc-2 {
+  width: 290px;
+  height: 290px;
+  border-bottom-color: rgba(156, 120, 255, 0.5);
+  border-left-color: rgba(156, 120, 255, 0.2);
+  transform: rotate(-18deg);
+}
+
+.reactor-data-arcs .arc-3 {
+  width: 360px;
+  height: 360px;
+  border-top-color: rgba(82, 173, 255, 0.38);
+  transform: rotate(98deg);
+}
+
+.reactor-data-arcs .arc-4 {
+  width: 420px;
+  height: 420px;
+  border-bottom-color: rgba(53, 141, 214, 0.2);
+  transform: rotate(9deg);
 }
 
 .three-canvas {
@@ -470,6 +564,26 @@
   gap: 6px;
   margin-bottom: 9px;
   flex-wrap: wrap;
+}
+
+.mission-list {
+  margin-bottom: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(90, 175, 255, 0.16);
+  background: rgba(6, 20, 33, 0.45);
+  font-size: 10px;
+  color: #86a9c5;
+  letter-spacing: 0.04em;
+  font-family: 'Cascadia Mono', 'Consolas', monospace;
+}
+
+.mission-list b {
+  color: #69d2ff;
+  font-weight: 600;
+  margin-right: 6px;
 }
 
 .comms-chip {
