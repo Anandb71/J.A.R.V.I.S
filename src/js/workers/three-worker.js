@@ -11,7 +11,7 @@ const SUIT_BASE_Y = -1.04;
 const SUIT_BASE_Z = -0.24;
 const SUIT_BASE_ROT_Y = -0.28;
 const SUIT_BASE_SCALE = 1.2;
-const HELMET_ASSET_URL = new URL('../../../superhero-mask-with-futuristic-design-for-coloring-and-crafting-projects-vector.svg', import.meta.url).href;
+const HELMET_ASSET_URL = new URL('../../assets/iron-mask.svg', import.meta.url).href;
 
 let renderer;
 let scene;
