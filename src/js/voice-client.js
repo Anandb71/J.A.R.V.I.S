@@ -1,12 +1,16 @@
 /**
- * Full-duplex voice client.
+ * Full-duplex voice client (new approach).
  *
- * Capture: @ricky0123/vad-web (Silero VAD in AudioWorklet)
- * Playback: Delegated to AudioTransport (MSE audio/mpeg)
+ * This implementation intentionally avoids third-party VAD worklets and instead
+ * uses a lightweight RMS-based speech detector with Web Audio.
  *
- * Architecture:
- *   Mic → getUserMedia(AEC+NS) → MicVAD → onSpeechEnd → PCM16 → WS binary
- *   Barge-in: onSpeechStart during speaking → send voice:interrupt
+ * Flow:
+ *   getUserMedia -> ScriptProcessor RMS VAD -> utterance buffer -> PCM16 chunks -> WS binary
+ *   then voice:speech_end control event.
+ *
+ * Important backend compatibility:
+ * - Backend drops binary frames > 64KB.
+ * - We therefore chunk PCM frames to 16KB before send.
  */
 
 export class VoiceClient {
@@ -15,20 +19,34 @@ export class VoiceClient {
     this.audioTransport = audioTransport;
     this.onStateChange = onStateChange;
     this.onMicLevel = onMicLevel;
-    this.vad = null;
     this.stream = null;
     this.isActive = false;
     this.audioCtx = null;
-    this.analyser = null;
-    this.micLevelRaf = null;
-    this.levelData = null;
+    this.sourceNode = null;
+    this.processorNode = null;
+
+    // VAD state
+    this.speaking = false;
+    this.speechChunks = [];
+    this.speechSamples = 0;
+    this.lastVoiceAtMs = 0;
+    this.lastStateEmitMs = 0;
+
+    // Tunables
+    this.voiceThreshold = 0.02;
+    this.endSilenceMs = 520;
+    this.minSpeechMs = 180;
+    this.maxSpeechMs = 10000;
+    this.targetSampleRate = 16000;
+
+    // Smoothing
+    this._levelSmoothed = 0;
   }
 
   async start() {
     if (this.isActive) return;
 
     try {
-      // 1. Mic capture with echo/noise suppression
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -39,32 +57,21 @@ export class VoiceClient {
         },
       });
 
-      // 2. Silero VAD via @ricky0123/vad-web
-      const { MicVAD } = await import('@ricky0123/vad-web');
-
-      this.vad = await MicVAD.new({
-        stream: this.stream,
-        onSpeechStart: () => this._onSpeechStart(),
-        onSpeechEnd: (audio) => this._onSpeechEnd(audio),
-        positiveSpeechThreshold: 0.65,
-        negativeSpeechThreshold: 0.25,
-        redemptionFrames: 6,
-        preSpeechPadFrames: 1,
-        minSpeechFrames: 2,
+      this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: this.targetSampleRate,
       });
 
-      this.vad.start();
-      this._startMicLevelTracking();
+      this.sourceNode = this.audioCtx.createMediaStreamSource(this.stream);
+      this.processorNode = this.audioCtx.createScriptProcessor(2048, 1, 1);
+      this.processorNode.onaudioprocess = (event) => this._onAudioProcess(event);
+
+      this.sourceNode.connect(this.processorNode);
+      this.processorNode.connect(this.audioCtx.destination);
+
       this.isActive = true;
       this.onStateChange?.('listening');
     } catch (error) {
-      this.vad?.destroy?.();
-      this.vad = null;
-      this._stopMicLevelTracking();
-      if (this.stream) {
-        this.stream.getTracks().forEach((track) => track.stop());
-        this.stream = null;
-      }
+      this.stop();
       this.isActive = false;
       throw error;
     }
@@ -81,75 +88,140 @@ export class VoiceClient {
     this.onStateChange?.('listening');
   }
 
-  _onSpeechEnd(audioFloat32) {
-    if (!audioFloat32 || audioFloat32.length === 0) return;
+  _onAudioProcess(event) {
+    if (!this.isActive) return;
 
-    // Convert Float32 [-1, 1] -> PCM16
-    const pcm16 = new Int16Array(audioFloat32.length);
-    for (let i = 0; i < audioFloat32.length; i += 1) {
-      const s = Math.max(-1, Math.min(1, audioFloat32[i]));
-      pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    const input = event.inputBuffer.getChannelData(0);
+    if (!input || input.length === 0) return;
+
+    const now = performance.now();
+
+    let sumSq = 0;
+    for (let i = 0; i < input.length; i += 1) {
+      const v = input[i];
+      sumSq += v * v;
+    }
+    const rms = Math.sqrt(sumSq / input.length);
+
+    // Smoothing for UI level
+    this._levelSmoothed = this._levelSmoothed * 0.8 + rms * 0.2;
+    this.onMicLevel?.(Math.min(1, this._levelSmoothed * 8));
+
+    const voiceDetected = rms >= this.voiceThreshold;
+
+    if (voiceDetected) {
+      this.lastVoiceAtMs = now;
+      if (!this.speaking) {
+        this.speaking = true;
+        this.speechChunks = [];
+        this.speechSamples = 0;
+        void this._onSpeechStart();
+      }
     }
 
-    // Send raw audio bytes as binary frame
-    this.socket.sendBinary(pcm16.buffer);
-    // Signal utterance boundary
+    if (this.speaking) {
+      // Copy chunk because input buffer is reused by browser
+      this.speechChunks.push(new Float32Array(input));
+      this.speechSamples += input.length;
+
+      const elapsedMs = (this.speechSamples / this.targetSampleRate) * 1000;
+      const silentLongEnough = !voiceDetected && (now - this.lastVoiceAtMs >= this.endSilenceMs);
+      const forceFlush = elapsedMs >= this.maxSpeechMs;
+
+      if (silentLongEnough || forceFlush) {
+        void this._flushSpeech();
+      }
+    }
+
+    // Avoid excessive state spam
+    if (now - this.lastStateEmitMs > 800 && !this.speaking) {
+      this.lastStateEmitMs = now;
+      this.onStateChange?.('listening');
+    }
+  }
+
+  _concatFloatChunks(chunks, totalSamples) {
+    const out = new Float32Array(totalSamples);
+    let offset = 0;
+    for (const c of chunks) {
+      out.set(c, offset);
+      offset += c.length;
+    }
+    return out;
+  }
+
+  _toPcm16Buffer(float32) {
+    const pcm16 = new Int16Array(float32.length);
+    for (let i = 0; i < float32.length; i += 1) {
+      const s = Math.max(-1, Math.min(1, float32[i]));
+      pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return new Uint8Array(pcm16.buffer);
+  }
+
+  _sendChunkedPcm(uint8Data) {
+    // Keep comfortably below backend 64KB frame guard.
+    const MAX_CHUNK_BYTES = 16 * 1024;
+    for (let i = 0; i < uint8Data.length; i += MAX_CHUNK_BYTES) {
+      const end = Math.min(i + MAX_CHUNK_BYTES, uint8Data.length);
+      const chunk = uint8Data.slice(i, end);
+      this.socket.sendBinary(chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength));
+    }
+  }
+
+  async _flushSpeech() {
+    if (!this.speaking) return;
+
+    const totalSamples = this.speechSamples;
+    const utteranceMs = (totalSamples / this.targetSampleRate) * 1000;
+
+    const chunks = this.speechChunks;
+
+    this.speaking = false;
+    this.speechChunks = [];
+    this.speechSamples = 0;
+
+    if (!chunks.length || utteranceMs < this.minSpeechMs) {
+      this.onStateChange?.('listening');
+      return;
+    }
+
+    const floatAudio = this._concatFloatChunks(chunks, totalSamples);
+    const pcmBytes = this._toPcm16Buffer(floatAudio);
+    this._sendChunkedPcm(pcmBytes);
     this.socket.send('voice:speech_end', {});
     this.onStateChange?.('processing');
   }
 
-  _startMicLevelTracking() {
-    if (!this.stream || this.audioCtx) return;
-    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = this.audioCtx.createMediaStreamSource(this.stream);
-    this.analyser = this.audioCtx.createAnalyser();
-    this.analyser.fftSize = 256;
-    this.levelData = new Uint8Array(this.analyser.fftSize);
-    source.connect(this.analyser);
+  stop() {
+    this.speaking = false;
+    this.speechChunks = [];
+    this.speechSamples = 0;
 
-    const tick = () => {
-      if (!this.analyser || !this.levelData) return;
-      this.analyser.getByteTimeDomainData(this.levelData);
-      let sum = 0;
-      for (let i = 0; i < this.levelData.length; i += 1) {
-        const centered = (this.levelData[i] - 128) / 128;
-        sum += centered * centered;
-      }
-      const rms = Math.sqrt(sum / this.levelData.length);
-      const normalized = Math.min(1, rms * 4);
-      this.onMicLevel?.(normalized);
-      this.micLevelRaf = requestAnimationFrame(tick);
-    };
-
-    tick();
-  }
-
-  _stopMicLevelTracking() {
-    if (this.micLevelRaf) {
-      cancelAnimationFrame(this.micLevelRaf);
-      this.micLevelRaf = null;
+    if (this.processorNode) {
+      this.processorNode.disconnect();
+      this.processorNode.onaudioprocess = null;
+      this.processorNode = null;
     }
-    this.onMicLevel?.(0);
-    this.levelData = null;
-    this.analyser = null;
+
+    if (this.sourceNode) {
+      this.sourceNode.disconnect();
+      this.sourceNode = null;
+    }
+
     if (this.audioCtx) {
       this.audioCtx.close().catch(() => {
         // noop
       });
       this.audioCtx = null;
     }
-  }
-
-  stop() {
-    this.vad?.destroy?.();
-    this.vad = null;
-    this._stopMicLevelTracking();
 
     if (this.stream) {
       this.stream.getTracks().forEach((track) => track.stop());
       this.stream = null;
     }
 
+    this.onMicLevel?.(0);
     this.isActive = false;
     this.onStateChange?.('idle');
   }
