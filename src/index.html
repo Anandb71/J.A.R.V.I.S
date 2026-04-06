@@ -15,7 +15,7 @@
 
       <!-- ── Top Bar ── -->
       <header class="hud-panel top-bar">
-        <div id="brand-pill" class="status-pill online brand-pill">JARVIS</div>
+        <div id="brand-pill" class="status-pill online brand-pill">JARVIS // COMMAND CORE</div>
 
         <div class="top-center">
           <div class="top-time-wrap">
@@ -26,6 +26,9 @@
             <span>CPU <span id="top-cpu" class="metric-value">--%</span></span>
             <span>GPU <span id="top-gpu" class="metric-value">--%</span></span>
             <span>RAM <span id="top-ram" class="metric-value">--%</span></span>
+          </div>
+          <div class="top-ticks" aria-hidden="true">
+            <span>00</span><span>03</span><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span><span>24</span>
           </div>
         </div>
 
@@ -69,6 +72,11 @@
           <div id="sys-disk">Disk: --%</div>
           <div id="sys-net-detail">↑ 0 KB/s  ↓ 0 KB/s</div>
         </div>
+        <div class="diag-bars" aria-hidden="true">
+          <div class="diag-bar"><span>THERMAL</span><i style="--p:72%"></i></div>
+          <div class="diag-bar"><span>STABILITY</span><i style="--p:91%"></i></div>
+          <div class="diag-bar"><span>SECURITY</span><i style="--p:84%"></i></div>
+        </div>
         <div class="panel-footer-note">AUTONOMY: ADAPTIVE · SAFETY: ENFORCED</div>
       </aside>
 
@@ -80,6 +88,12 @@
           <span class="ring ring-a"></span>
           <span class="ring ring-b"></span>
           <span class="ring ring-c"></span>
+        </div>
+        <div class="reactor-data-arcs" aria-hidden="true">
+          <span class="arc arc-1"></span>
+          <span class="arc arc-2"></span>
+          <span class="arc arc-3"></span>
+          <span class="arc arc-4"></span>
         </div>
         <div class="orb-wrap">
           <div class="orb-ring"></div>
@@ -98,6 +112,11 @@
           <span class="comms-chip">Live</span>
           <span class="comms-chip">Low Latency</span>
           <span class="comms-chip">Secure Link</span>
+        </div>
+        <div class="mission-list" aria-hidden="true">
+          <div><b>QUEUE</b> Target analysis pipeline</div>
+          <div><b>QUEUE</b> System integrity sweep</div>
+          <div><b>LIVE</b> Assist channel active</div>
         </div>
         <div id="chat-panel" class="chat-panel"></div>
         <div class="chat-input-wrap">
