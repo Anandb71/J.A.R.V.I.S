@@ -1,4 +1,5 @@
 import * as THREE from '../../../node_modules/three/build/three.module.js';
+import { GLTFLoader } from '../../../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 
 const TIER_CONFIG = {
   high: { orb: 5000, ambient: 3000, bloom: true, bloomStrength: 0.6, rings: 3, minFps: 50 },
@@ -20,6 +21,7 @@ let suitCore;
 let suitVisor;
 let suitOutline;
 let suitArmorMaterials = [];
+let suitBuildToken = 0;
 let state = 'idle';
 let audioLevel = 0;
 let stressLevel = 0;
@@ -203,6 +205,13 @@ function buildScene() {
   buildSuitAvatar();
 }
 
+function loadGlb(url) {
+  const loader = new GLTFLoader();
+  return new Promise((resolve, reject) => {
+    loader.load(url, resolve, undefined, reject);
+  });
+}
+
 function makeArmorMaterial(colorHex = 0x7b1f35) {
   const material = new THREE.MeshStandardMaterial({
     color: colorHex,
@@ -216,6 +225,110 @@ function makeArmorMaterial(colorHex = 0x7b1f35) {
 }
 
 function buildSuitAvatar() {
+  const token = ++suitBuildToken;
+  buildExternalSuitAvatar(token).catch(() => {
+    if (token !== suitBuildToken) return;
+    buildFallbackSuitAvatar();
+  });
+}
+
+async function buildExternalSuitAvatar(token) {
+  const modelUrl = new URL('../../assets/models/robot-expressive.glb', import.meta.url).href;
+  const gltf = await loadGlb(modelUrl);
+  if (token !== suitBuildToken) return;
+
+  suitArmorMaterials = [];
+  const model = gltf.scene;
+  const tintA = new THREE.Color('#8a1028');
+  const tintB = new THREE.Color('#b97d0f');
+  let meshCount = 0;
+
+  model.traverse((node) => {
+    if (!node.isMesh) return;
+    node.castShadow = false;
+    node.receiveShadow = false;
+    const srcMat = node.material;
+    const mats = Array.isArray(srcMat) ? srcMat : [srcMat];
+    const nextMats = mats.map((m) => {
+      const next = m?.clone?.() || new THREE.MeshStandardMaterial();
+      next.metalness = 0.78;
+      next.roughness = 0.35;
+      const base = meshCount % 3 === 0 ? tintB : tintA;
+      if (next.color) next.color.lerp(base, 0.82);
+      next.emissive = new THREE.Color('#1e0b12');
+      next.emissiveIntensity = 0.24;
+      suitArmorMaterials.push(next);
+      meshCount += 1;
+      return next;
+    });
+    node.material = Array.isArray(srcMat) ? nextMats : nextMats[0];
+  });
+
+  const bounds = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  bounds.getSize(size);
+  bounds.getCenter(center);
+
+  const targetHeight = 3.7;
+  const scale = size.y > 0 ? targetHeight / size.y : 1;
+  model.scale.setScalar(scale);
+  model.position.sub(center.multiplyScalar(scale));
+  model.position.y = -0.2;
+  model.position.z = 0.03;
+
+  suitGroup = new THREE.Group();
+  suitGroup.position.set(3.35, -1.2, -0.35);
+  suitGroup.rotation.y = -0.4;
+  suitGroup.scale.setScalar(1.08);
+  suitGroup.add(model);
+
+  suitCore = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, 0.08, 24),
+    new THREE.MeshStandardMaterial({
+      color: 0x73d7ff,
+      emissive: 0x2dbdff,
+      emissiveIntensity: 1.3,
+      metalness: 0.2,
+      roughness: 0.12,
+    }),
+  );
+  suitCore.rotation.x = Math.PI / 2;
+  suitCore.position.set(0.02, 0.68, 0.38);
+  suitGroup.add(suitCore);
+
+  suitVisor = new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.06, 0.07),
+    new THREE.MeshStandardMaterial({
+      color: 0x8ce1ff,
+      emissive: 0x5dd3ff,
+      emissiveIntensity: 1.05,
+      metalness: 0.15,
+      roughness: 0.08,
+    }),
+  );
+  suitVisor.position.set(0.02, 1.82, 0.25);
+  suitGroup.add(suitVisor);
+
+  const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.45, 4.25, 1.1));
+  suitOutline = new THREE.LineSegments(
+    edgeGeo,
+    new THREE.LineBasicMaterial({ color: 0x3bbaff, transparent: true, opacity: 0.24 }),
+  );
+  suitOutline.position.y = -0.2;
+  suitGroup.add(suitOutline);
+
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.98, 1.08, 0.1, 34),
+    new THREE.MeshBasicMaterial({ color: 0x1b3852, transparent: true, opacity: 0.4 }),
+  );
+  base.position.set(0, -2.02, -0.08);
+  suitGroup.add(base);
+
+  scene.add(suitGroup);
+}
+
+function buildFallbackSuitAvatar() {
   suitGroup = new THREE.Group();
   suitGroup.position.set(3.45, -1.15, -0.35);
   suitGroup.rotation.y = -0.38;
