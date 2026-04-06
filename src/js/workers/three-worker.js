@@ -1,4 +1,5 @@
 import * as THREE from '../../../node_modules/three/build/three.module.js';
+import { GLTFLoader } from '../../../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 
 const TIER_CONFIG = {
   high: { orb: 5000, ambient: 3000, bloom: true, bloomStrength: 0.6, rings: 3, minFps: 50 },
@@ -20,19 +21,131 @@ let suitCore;
 let suitVisor;
 let suitOutline;
 let suitArmorMaterials = [];
-function makeArmorMaterial(colorHex = 0x9b1e2e) {
+let suitBuildToken = 0;
+let state = 'idle';
+let audioLevel = 0;
+let stressLevel = 0;
+let tier = 'medium';
+let config = TIER_CONFIG.medium;
+let width = 1;
+let height = 1;
+let running = false;
 let frameHandle = null;
 let lastFrameTimes = [];
-    metalness: 0.86,
-    roughness: 0.29,
-    emissive: 0x12050a,
-    emissiveIntensity: 0.22,
+let fpsWarningCountdown = 0;
+let targetColor = new THREE.Color('#00b4ff');
+let currentColor = new THREE.Color('#00b4ff');
+let targetScale = 1;
 let currentScale = 1;
 let targetSpread = 1;
 let currentSpread = 1;
 let time = 0;
 
 self.onmessage = async (event) => {
+  const message = event.data || {};
+  if (message.type === 'init') {
+    await init(message);
+  } else if (message.type === 'set_state') {
+    state = message.state || 'idle';
+    syncState();
+  } else if (message.type === 'set_audio_level') {
+    audioLevel = Math.max(0, Math.min(1, Number(message.level) || 0));
+    ensureRunning();
+  } else if (message.type === 'set_stress_level') {
+    stressLevel = Math.max(0, Math.min(1, Number(message.level) || 0));
+    ensureRunning();
+  } else if (message.type === 'resize') {
+    resize(message.width, message.height);
+  } else if (message.type === 'set_tier') {
+    tier = message.tier in TIER_CONFIG ? message.tier : 'medium';
+    rebuild(tier);
+  }
+};
+
+async function init(message) {
+  width = message.width || 1;
+  height = message.height || 1;
+  tier = message.tier in TIER_CONFIG ? message.tier : 'medium';
+  config = TIER_CONFIG[tier];
+
+  renderer = new THREE.WebGLRenderer({ canvas: message.canvas, antialias: tier !== 'low', alpha: true });
+  renderer.setPixelRatio(1);
+  renderer.setSize(width, height, false);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x050814, 6, 28);
+
+  camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+  camera.position.set(0.35, 0.1, 9.3);
+
+  buildScene();
+  postMessage({ type: 'ready' });
+  ensureRunning();
+}
+
+function buildScene() {
+  scene.clear();
+  rings.forEach((ring) => scene.remove(ring));
+  rings = [];
+  suitArmorMaterials = [];
+
+  sceneAmbientLight = new THREE.AmbientLight(0x86a8c9, 0.45);
+  scene.add(sceneAmbientLight);
+
+  sceneKeyLight = new THREE.DirectionalLight(0x8cc8ff, 0.9);
+  sceneKeyLight.position.set(4.5, 6.5, 8.5);
+  scene.add(sceneKeyLight);
+
+  const orbGeometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(config.orb * 3);
+  const seeds = new Float32Array(config.orb);
+  for (let i = 0; i < config.orb; i += 1) {
+    const idx = i * 3;
+    const u = Math.random() * Math.PI * 2;
+    const v = Math.acos(2 * Math.random() - 1);
+    const r = 2.1 + Math.random() * 0.35;
+    positions[idx] = r * Math.sin(v) * Math.cos(u);
+    positions[idx + 1] = r * Math.cos(v);
+    positions[idx + 2] = r * Math.sin(v) * Math.sin(u);
+    seeds[i] = Math.random();
+  }
+  orbGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  orbGeometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+
+  const orbVertex = `
+    uniform float uTime;
+    uniform float uScale;
+    uniform float uSpread;
+    uniform float uAudioLevel;
+    attribute float aSeed;
+    varying float vSeed;
+    void main() {
+      vSeed = aSeed;
+      vec3 pos = position;
+      float pulse = 1.0 + sin(uTime * 2.0 + aSeed * 6.2831) * 0.08;
+      float audioPush = 1.0 + uAudioLevel * 0.28 * aSeed;
+      pos *= uScale * uSpread * pulse * audioPush;
+      vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+      gl_PointSize = clamp(3.0 * (1.0 / -mvPosition.z) * 220.0, 1.5, 12.0);
+      gl_Position = projectionMatrix * mvPosition;
+    }
+  `;
+
+  const orbFragment = `
+    uniform vec3 uColor;
+    uniform float uTime;
+    varying float vSeed;
+    void main() {
+      vec2 uv = gl_PointCoord - vec2(0.5);
+      float dist = length(uv);
+      if (dist > 0.5) discard;
+      float fresnel = pow(1.0 - dist * 2.0, 2.5);
+      float pulse = 0.9 + sin(uTime * 2.0 + vSeed * 12.0) * 0.1;
+      float alpha = smoothstep(0.5, 0.08, dist) * fresnel * pulse;
+      gl_FragColor = vec4(uColor * (0.65 + fresnel), alpha);
+    }
+  `;
 
   const orbMaterial = new THREE.ShaderMaterial({
     uniforms: {
@@ -40,158 +153,101 @@ self.onmessage = async (event) => {
       uScale: { value: 1 },
       uSpread: { value: 1 },
       uAudioLevel: { value: 0 },
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.35, 0.52), makeArmorMaterial(0xaa1f2c));
+      uColor: { value: currentColor.clone() },
     },
     vertexShader: orbVertex,
     fragmentShader: orbFragment,
-  const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.92, 0.12), makeArmorMaterial(0xc59b2e));
+    transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-
-  const chestFrame = new THREE.Mesh(new THREE.BoxGeometry(0.93, 1.02, 0.07), makeArmorMaterial(0x8d1622));
-  chestFrame.position.set(0, 0.46, 0.25);
-  frame.add(chestFrame);
   });
 
-    new THREE.CylinderGeometry(0.125, 0.125, 0.1, 28),
+  orb = new THREE.Points(orbGeometry, orbMaterial);
   orb.layers.enable(1);
   scene.add(orb);
 
-      emissiveIntensity: 2.0,
+  if (config.bloom) {
     const haloGeometry = new THREE.SphereGeometry(2.45, 32, 32);
     const haloMaterial = new THREE.MeshBasicMaterial({
       color: 0x00b4ff,
       transparent: true,
       opacity: config.bloomStrength * 0.35,
-  suitCore.position.set(0, 0.46, 0.4);
+      blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
-  const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.42, 0.44), makeArmorMaterial(0xa51d2b));
-  helmet.position.set(0, 1.34, 0.03);
-  frame.add(helmet);
+    halo = new THREE.Mesh(haloGeometry, haloMaterial);
+    halo.layers.enable(1);
+    scene.add(halo);
+  }
 
-  const faceplate = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.31, 0.09), makeArmorMaterial(0xd3ab3b));
-  faceplate.position.set(0, 1.33, 0.25);
-  frame.add(faceplate);
+  const ringMaterial = new THREE.MeshBasicMaterial({ color: 0x00b4ff, transparent: true, opacity: 0.55, wireframe: true });
+  for (let i = 0; i < config.rings; i += 1) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.5 + i * 0.28, 0.03, 10, 120), ringMaterial.clone());
+    ring.rotation.x = i * 0.55;
+    ring.rotation.y = i * 0.9;
+    ring.layers.enable(1);
+    rings.push(ring);
+    scene.add(ring);
+  }
 
-  const brow = new THREE.Mesh(new THREE.BoxGeometry(0.37, 0.06, 0.08), makeArmorMaterial(0x8d1622));
-  brow.position.set(0, 1.46, 0.21);
-  frame.add(brow);
+  const ambGeometry = new THREE.BufferGeometry();
+  const ambPositions = new Float32Array(config.ambient * 3);
+  for (let i = 0; i < config.ambient; i += 1) {
+    const idx = i * 3;
+    ambPositions[idx] = (Math.random() - 0.5) * 16;
+    ambPositions[idx + 1] = (Math.random() - 0.5) * 10;
+    ambPositions[idx + 2] = (Math.random() - 0.5) * 16;
+  }
+  ambGeometry.setAttribute('position', new THREE.BufferAttribute(ambPositions, 3));
+  ambient = new THREE.Points(ambGeometry, new THREE.PointsMaterial({ color: 0x7dcfff, size: 0.02, transparent: true, opacity: 0.6 }));
+  scene.add(ambient);
 
-  const jawL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, 0.07), makeArmorMaterial(0xa51d2b));
-  jawL.position.set(-0.16, 1.21, 0.22);
-  frame.add(jawL);
+  buildSuitAvatar();
+}
 
-  const jawR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, 0.07), makeArmorMaterial(0xa51d2b));
-  jawR.position.set(0.16, 1.21, 0.22);
-  frame.add(jawR);
+function loadGlb(url) {
+  const loader = new GLTFLoader();
+  return new Promise((resolve, reject) => {
+    loader.load(url, resolve, undefined, reject);
+  });
+}
 
-  suitVisor = new THREE.Mesh(
-    new THREE.BoxGeometry(0.22, 0.04, 0.06),
-    new THREE.MeshStandardMaterial({
-      color: 0xb8edff,
-      emissive: 0x8ce6ff,
-      emissiveIntensity: 1.45,
-      metalness: 0.12,
-      roughness: 0.06,
-    }),
-  );
-  suitVisor.position.set(0, 1.37, 0.29);
-  frame.add(suitVisor);
+function makeArmorMaterial(colorHex = 0x7b1f35) {
+  const material = new THREE.MeshStandardMaterial({
+    color: colorHex,
+    metalness: 0.78,
+    roughness: 0.36,
+    emissive: 0x18070d,
+    emissiveIntensity: 0.25,
+  });
+  suitArmorMaterials.push(material);
+  return material;
+}
 
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.14, 14), makeArmorMaterial(0x6f121d));
-  neck.position.set(0, 1.08, 0.02);
-  frame.add(neck);
+function buildSuitAvatar() {
+  const token = ++suitBuildToken;
+  buildExternalSuitAvatar(token).catch(() => {
+    if (token !== suitBuildToken) return;
+    buildFallbackSuitAvatar();
+  });
+}
 
-  const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(0.23, 18, 16), makeArmorMaterial(0xaa1f2c));
-  shoulderL.position.set(-0.57, 0.98, 0.03);
-  frame.add(shoulderL);
+async function buildExternalSuitAvatar(token) {
+  const modelUrl = new URL('../../assets/models/robot-expressive.glb', import.meta.url).href;
+  const gltf = await loadGlb(modelUrl);
+  if (token !== suitBuildToken) return;
 
-  const shoulderR = new THREE.Mesh(new THREE.SphereGeometry(0.23, 18, 16), makeArmorMaterial(0xaa1f2c));
-  shoulderR.position.set(0.57, 0.98, 0.03);
-  frame.add(shoulderR);
+  suitArmorMaterials = [];
+  const model = gltf.scene;
+  const tintA = new THREE.Color('#8a1028');
+  const tintB = new THREE.Color('#b97d0f');
+  let meshCount = 0;
 
-  const shoulderCapL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.12, 0.2), makeArmorMaterial(0xd3ab3b));
-  shoulderCapL.position.set(-0.57, 1.02, 0.16);
-  frame.add(shoulderCapL);
-
-  const shoulderCapR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.12, 0.2), makeArmorMaterial(0xd3ab3b));
-  shoulderCapR.position.set(0.57, 1.02, 0.16);
-  frame.add(shoulderCapR);
-
-  const upperArmGeo = new THREE.CapsuleGeometry(0.12, 0.45, 6, 12);
-  const lowerArmGeo = new THREE.CapsuleGeometry(0.1, 0.42, 6, 12);
-
-  const upperArmL = new THREE.Mesh(upperArmGeo, makeArmorMaterial(0xa51d2b));
-  upperArmL.position.set(-0.71, 0.64, 0.03);
-  upperArmL.rotation.z = 0.2;
-  frame.add(upperArmL);
-
-  const upperArmR = new THREE.Mesh(upperArmGeo, makeArmorMaterial(0xa51d2b));
-  upperArmR.position.set(0.71, 0.64, 0.03);
-  upperArmR.rotation.z = -0.2;
-  frame.add(upperArmR);
-
-  const lowerArmL = new THREE.Mesh(lowerArmGeo, makeArmorMaterial(0xd3ab3b));
-  lowerArmL.position.set(-0.78, 0.23, 0.06);
-  lowerArmL.rotation.z = 0.13;
-  frame.add(lowerArmL);
-
-  const lowerArmR = new THREE.Mesh(lowerArmGeo, makeArmorMaterial(0xd3ab3b));
-  lowerArmR.position.set(0.78, 0.23, 0.06);
-  lowerArmR.rotation.z = -0.13;
-  frame.add(lowerArmR);
-
-  const repulsorL = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.04, 0.04, 0.04, 14),
-    new THREE.MeshStandardMaterial({ color: 0x83dcff, emissive: 0x4bcaff, emissiveIntensity: 1.1 }),
-  );
-  repulsorL.position.set(-0.84, 0.04, 0.14);
-  repulsorL.rotation.z = Math.PI / 2;
-  frame.add(repulsorL);
-
-  const repulsorR = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.04, 0.04, 0.04, 14),
-    new THREE.MeshStandardMaterial({ color: 0x83dcff, emissive: 0x4bcaff, emissiveIntensity: 1.1 }),
-  );
-  repulsorR.position.set(0.84, 0.04, 0.14);
-  repulsorR.rotation.z = Math.PI / 2;
-  frame.add(repulsorR);
-
-  const hip = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.38, 0.42), makeArmorMaterial(0x8d1622));
-  hip.position.set(0, -0.46, 0.0);
-  frame.add(hip);
-
-  const hipPlate = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.12, 0.1), makeArmorMaterial(0xd3ab3b));
-  hipPlate.position.set(0, -0.31, 0.24);
-  frame.add(hipPlate);
-
-  const thighGeo = new THREE.CapsuleGeometry(0.15, 0.58, 6, 12);
-  const shinGeo = new THREE.CapsuleGeometry(0.12, 0.52, 6, 12);
-
-  const thighL = new THREE.Mesh(thighGeo, makeArmorMaterial(0xaa1f2c));
-  thighL.position.set(-0.24, -0.95, 0.02);
-  frame.add(thighL);
-
-  const thighR = new THREE.Mesh(thighGeo, makeArmorMaterial(0xaa1f2c));
-  thighR.position.set(0.24, -0.95, 0.02);
-  frame.add(thighR);
-
-  const shinL = new THREE.Mesh(shinGeo, makeArmorMaterial(0xd3ab3b));
-  shinL.position.set(-0.24, -1.58, 0.07);
-  frame.add(shinL);
-
-  const shinR = new THREE.Mesh(shinGeo, makeArmorMaterial(0xd3ab3b));
-  shinR.position.set(0.24, -1.58, 0.07);
-  frame.add(shinR);
-
-  const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.44), makeArmorMaterial(0x8d1622));
-  bootL.position.set(-0.24, -1.98, 0.11);
-  frame.add(bootL);
-
-  const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.44), makeArmorMaterial(0x8d1622));
-  bootR.position.set(0.24, -1.98, 0.11);
-  frame.add(bootR);
+  model.traverse((node) => {
+    if (!node.isMesh) return;
+    node.castShadow = false;
+    node.receiveShadow = false;
+    const srcMat = node.material;
     const mats = Array.isArray(srcMat) ? srcMat : [srcMat];
     const nextMats = mats.map((m) => {
       const next = m?.clone?.() || new THREE.MeshStandardMaterial();
