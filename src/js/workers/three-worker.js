@@ -236,8 +236,8 @@ function syncState() {
 
   if (stressLevel >= 0.9) {
     targetColor.set('#ff3366');
-  } else if (stressLevel >= 0.75) {
-    targetColor.lerp(new THREE.Color('#ffb800'), 0.6);
+  } else if (stressLevel >= 0.8) {
+    targetColor.lerp(new THREE.Color('#35d6ff'), 0.55);
   }
   ensureRunning();
 }
@@ -273,8 +273,10 @@ function render(now) {
     ring.rotation.x += 0.003 + index * 0.0007;
     ring.rotation.y += 0.004 + index * 0.0005;
     ring.material.opacity = 0.35 + audioLevel * 0.35;
-    if (stressLevel >= 0.75) {
-      ring.material.color.set(stressLevel >= 0.9 ? '#ff3366' : '#ffb800');
+    if (stressLevel >= 0.92) {
+      ring.material.color.set('#ff3366');
+    } else if (stressLevel >= 0.8) {
+      ring.material.color.set('#35d6ff');
     } else {
       ring.material.color.set('#00b4ff');
     }
