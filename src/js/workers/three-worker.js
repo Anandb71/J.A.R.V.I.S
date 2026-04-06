@@ -1,5 +1,4 @@
 import * as THREE from '../../../node_modules/three/build/three.module.js';
-import { SVGLoader } from '../../../node_modules/three/examples/jsm/loaders/SVGLoader.js';
 
 const TIER_CONFIG = {
   high: { orb: 5000, ambient: 3000, bloom: true, bloomStrength: 0.6, rings: 3, minFps: 50 },
@@ -30,7 +29,6 @@ let suitOutline;
 let suitArmorMaterials = [];
 let suitMaskPlane;
 let suitMaskMaterial;
-let suitMaskVectorGroup;
 let state = 'idle';
 let audioLevel = 0;
 let stressLevel = 0;
@@ -271,74 +269,22 @@ function createFallbackHelmetTexture() {
   return tex;
 }
 
-async function loadHelmetVectorFromSvg(url) {
-  const text = await fetch(url).then((r) => {
-    if (!r.ok) throw new Error(`svg_fetch_${r.status}`);
-    return r.text();
+function loadHelmetTexture(url) {
+  return new Promise((resolve, reject) => {
+    const loader = new THREE.ImageBitmapLoader();
+    loader.load(
+      url,
+      (imageBitmap) => {
+        const texture = new THREE.Texture(imageBitmap);
+        texture.needsUpdate = true;
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.flipY = false;
+        resolve(texture);
+      },
+      undefined,
+      reject,
+    );
   });
-
-  const loader = new SVGLoader();
-  const parsed = loader.parse(text);
-  const group = new THREE.Group();
-
-  parsed.paths.forEach((path) => {
-    const style = path.userData?.style || {};
-
-    // Fill shapes (if any)
-    const shapes = SVGLoader.createShapes(path);
-    if (shapes.length) {
-      shapes.forEach((shape) => {
-        const fillMat = new THREE.MeshBasicMaterial({
-          color: 0xff4068,
-          transparent: true,
-          opacity: 0.08,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        });
-        suitArmorMaterials.push(fillMat);
-        const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), fillMat);
-        group.add(mesh);
-      });
-    }
-
-    // Stroke geometry (works for line-art SVGs)
-    if (path.subPaths?.length) {
-      path.subPaths.forEach((subPath) => {
-        const points = subPath.getPoints();
-        const strokeGeometry = SVGLoader.pointsToStroke(points, style);
-        if (!strokeGeometry) return;
-        const strokeMat = new THREE.MeshBasicMaterial({
-          color: 0xff4a70,
-          transparent: true,
-          opacity: 0.95,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        });
-        suitArmorMaterials.push(strokeMat);
-        const strokeMesh = new THREE.Mesh(strokeGeometry, strokeMat);
-        group.add(strokeMesh);
-      });
-    }
-  });
-
-  // Center + scale into the side panel area.
-  const box = new THREE.Box3().setFromObject(group);
-  const size = new THREE.Vector3();
-  const center = new THREE.Vector3();
-  box.getSize(size);
-  box.getCenter(center);
-  const fit = Math.max(size.x, size.y, 1);
-  const target = 1.25;
-  const scale = target / fit;
-  group.scale.setScalar(scale);
-  group.position.x = -center.x * scale;
-  group.position.y = -center.y * scale + 0.63;
-  group.position.z = 0.05;
-  group.rotation.z = Math.PI;
-
-  return group;
 }
 
 function buildSuitAvatar() {
@@ -371,9 +317,6 @@ function buildSuitAvatar() {
   suitMaskPlane = new THREE.Mesh(new THREE.PlaneGeometry(1.48, 1.48), suitMaskMaterial);
   suitMaskPlane.position.set(0, 0.63, 0.04);
   suitGroup.add(suitMaskPlane);
-
-  suitMaskVectorGroup = new THREE.Group();
-  suitGroup.add(suitMaskVectorGroup);
 
   suitCore = new THREE.Mesh(
     new THREE.RingGeometry(0.09, 0.135, 24),
@@ -410,14 +353,12 @@ function buildSuitAvatar() {
   suitGroup.add(suitOutline);
   scene.add(suitGroup);
 
-  loadHelmetVectorFromSvg(HELMET_ASSET_URL)
-    .then((svgGroup) => {
-      if (!suitGroup || !suitMaskVectorGroup) return;
-      suitMaskVectorGroup.clear();
-      suitMaskVectorGroup.add(svgGroup);
-      if (suitMaskMaterial) {
-        suitMaskMaterial.opacity = 0.18;
-      }
+  loadHelmetTexture(HELMET_ASSET_URL)
+    .then((tex) => {
+      if (!suitMaskMaterial) return;
+      if (suitMaskMaterial.map) suitMaskMaterial.map.dispose();
+      suitMaskMaterial.map = tex;
+      suitMaskMaterial.needsUpdate = true;
     })
     .catch(() => {
       // Fallback texture is already applied.
@@ -570,11 +511,6 @@ function render(now) {
     if (suitMaskPlane) {
       suitMaskPlane.rotation.z = Math.sin(time * 0.9) * 0.04;
       suitMaskPlane.scale.setScalar(1 + audioLevel * 0.05 + stressLevel * 0.04);
-    }
-
-    if (suitMaskVectorGroup) {
-      suitMaskVectorGroup.rotation.z = Math.sin(time * 0.9) * 0.04;
-      suitMaskVectorGroup.scale.setScalar(1 + audioLevel * 0.05 + stressLevel * 0.04);
     }
 
     suitArmorMaterials.forEach((material, idx) => {
