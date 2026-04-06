@@ -1,16 +1,58 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, session, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, session, Tray, Menu, nativeImage, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const { spawn, execFile } = require('node:child_process');
+const { promisify } = require('node:util');
 const { PythonBridge } = require('./python-bridge');
 const { CredentialStore } = require('./credential-store');
+
+const execFileAsync = promisify(execFile);
 
 let mainWindow;
 let hudVisible = true;
 let clickThrough = false;
 let tray = null;
+let isQuitting = false;
+let backendStatusInterval = null;
+let serviceHealthInterval = null;
+
+const BACKEND_PORT = Number(process.env.JARVIS_BACKEND_PORT || 8765);
+const AI_PORT = Number(process.env.JARVIS_AI_PORT || 11434);
 
 const pythonBridge = new PythonBridge();
 let credentialStore = null;
+let ollamaProcess = null;
+let ollamaRestartTimer = null;
+let ollamaRestarts = 0;
+const OLLAMA_MAX_RESTARTS = 8;
+
+const serviceHealth = {
+  ui: { up: true, latencyMs: 0 },
+  api: { up: false, latencyMs: null, url: `http://127.0.0.1:${BACKEND_PORT}/api/health` },
+  ai: { up: false, latencyMs: null, url: `http://127.0.0.1:${AI_PORT}/api/tags` },
+};
+
+let microphonePermissionDecision = 'unknown'; // unknown | granted | denied
+
+async function promptMicrophonePermission() {
+  if (microphonePermissionDecision === 'granted') return true;
+  if (microphonePermissionDecision === 'denied') return false;
+
+  const response = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    title: 'Microphone Access Required',
+    message: 'JARVIS needs microphone access for voice chat.',
+    detail: 'Allow microphone access now? You can change this later from JARVIS settings / app restart.',
+    buttons: ['Allow', 'Deny'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  });
+
+  const granted = response.response === 0;
+  microphonePermissionDecision = granted ? 'granted' : 'denied';
+  return granted;
+}
 
 function isTrustedSender(event) {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
@@ -24,17 +66,172 @@ function broadcastBackendStatus() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.webContents.send('jarvis:backend-status', {
     running: Boolean(pythonBridge.process),
+    port: BACKEND_PORT,
   });
+}
+
+function broadcastServiceHealth() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('jarvis:service-health', {
+    ...serviceHealth,
+    backendPort: BACKEND_PORT,
+    aiPort: AI_PORT,
+  });
+}
+
+async function listListeningPids(port) {
+  try {
+    const { stdout } = await execFileAsync('cmd.exe', ['/d', '/s', '/c', `netstat -ano -p tcp | findstr /R /C:":${port} "`]);
+    const pids = new Set();
+    stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .forEach((line) => {
+        const cols = line.split(/\s+/);
+        if (cols.length < 5) return;
+        const state = cols[3]?.toUpperCase?.() || '';
+        const pid = Number(cols[4]);
+        if (state === 'LISTENING' && Number.isFinite(pid) && pid > 0) {
+          pids.add(pid);
+        }
+      });
+    return [...pids];
+  } catch {
+    return [];
+  }
+}
+
+async function killProcessTree(pid) {
+  if (!pid || pid === process.pid) return;
+  try {
+    await execFileAsync('taskkill.exe', ['/PID', String(pid), '/T', '/F']);
+  } catch {
+    // Best-effort cleanup.
+  }
+}
+
+async function cleanupGhostListeners() {
+  const ports = [BACKEND_PORT, AI_PORT];
+  for (const port of ports) {
+    const pids = await listListeningPids(port);
+    for (const pid of pids) {
+      if (pid !== process.pid) {
+        await killProcessTree(pid);
+      }
+    }
+  }
+}
+
+async function probeUrl(url, timeoutMs = 1600) {
+  const started = Date.now();
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await fetch(url, { method: 'GET', signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) {
+      return { up: false, latencyMs: null };
+    }
+    return { up: true, latencyMs: Date.now() - started };
+  } catch {
+    return { up: false, latencyMs: null };
+  }
+}
+
+async function refreshServiceHealth() {
+  const [apiProbe, aiProbe] = await Promise.all([
+    probeUrl(`http://127.0.0.1:${BACKEND_PORT}/api/health`),
+    probeUrl(`http://127.0.0.1:${AI_PORT}/api/tags`),
+  ]);
+
+  serviceHealth.ui = { up: true, latencyMs: 0 };
+  serviceHealth.api = { ...serviceHealth.api, ...apiProbe };
+  serviceHealth.ai = { ...serviceHealth.ai, ...aiProbe };
+  broadcastServiceHealth();
+}
+
+function clearOllamaRestartTimer() {
+  if (ollamaRestartTimer) {
+    clearTimeout(ollamaRestartTimer);
+    ollamaRestartTimer = null;
+  }
+}
+
+function startOllama() {
+  if (ollamaProcess) return;
+  clearOllamaRestartTimer();
+
+  ollamaProcess = spawn('ollama', ['serve'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: false,
+  });
+
+  ollamaProcess.stdout.on('data', (chunk) => {
+    console.log(`[ollama] ${chunk.toString().trim()}`);
+  });
+
+  ollamaProcess.stderr.on('data', (chunk) => {
+    console.error(`[ollama:err] ${chunk.toString().trim()}`);
+  });
+
+  ollamaProcess.on('error', (error) => {
+    console.error(`[ollama:spawn:error] ${error?.message || error}`);
+  });
+
+  ollamaProcess.on('exit', () => {
+    ollamaProcess = null;
+    if (isQuitting) return;
+    if (ollamaRestarts >= OLLAMA_MAX_RESTARTS) return;
+    ollamaRestarts += 1;
+    const backoffMs = Math.min(1000 * (2 ** (ollamaRestarts - 1)), 10000);
+    ollamaRestartTimer = setTimeout(() => {
+      ollamaRestartTimer = null;
+      startOllama();
+    }, backoffMs);
+  });
+}
+
+function stopOllama() {
+  clearOllamaRestartTimer();
+  if (!ollamaProcess) return;
+
+  const pid = ollamaProcess.pid;
+  ollamaProcess = null;
+  if (pid) {
+    spawn('taskkill.exe', ['/PID', String(pid), '/T', '/F'], {
+      stdio: 'ignore',
+      shell: false,
+    });
+  }
+}
+
+function stopIntervals() {
+  if (backendStatusInterval) {
+    clearInterval(backendStatusInterval);
+    backendStatusInterval = null;
+  }
+  if (serviceHealthInterval) {
+    clearInterval(serviceHealthInterval);
+    serviceHealthInterval = null;
+  }
+}
+
+function shutdownServices() {
+  stopIntervals();
+  pythonBridge.stop();
+  stopOllama();
 }
 
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1600,
     height: 900,
-    transparent: true,
+    transparent: false,
     frame: false,
     alwaysOnTop: true,
-    hasShadow: false,
+    hasShadow: true,
+    backgroundColor: '#020812',
     resizable: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -111,6 +308,38 @@ function setupIpc() {
     if (!isTrustedSender(event)) return { running: false };
     return {
     running: Boolean(pythonBridge.process),
+    port: BACKEND_PORT,
+    };
+  });
+
+  ipcMain.handle('jarvis:get-service-health', (event) => {
+    if (!isTrustedSender(event)) {
+      return {
+        ui: { up: false, latencyMs: null },
+        api: { up: false, latencyMs: null },
+        ai: { up: false, latencyMs: null },
+        backendPort: BACKEND_PORT,
+        aiPort: AI_PORT,
+      };
+    }
+    return {
+      ...serviceHealth,
+      backendPort: BACKEND_PORT,
+      aiPort: AI_PORT,
+    };
+  });
+
+  ipcMain.handle('jarvis:request-microphone-access', async (event) => {
+    if (!isTrustedSender(event)) return { granted: false };
+    const granted = await promptMicrophonePermission();
+    return { granted };
+  });
+
+  ipcMain.handle('jarvis:get-microphone-access', (event) => {
+    if (!isTrustedSender(event)) return { state: 'unknown', granted: false };
+    return {
+      state: microphonePermissionDecision,
+      granted: microphonePermissionDecision === 'granted',
     };
   });
 
@@ -133,15 +362,37 @@ function setupIpc() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   credentialStore = new CredentialStore(app.getPath('userData'));
 
-  // Security: explicitly control permission requests.
+  // Security + UX: explicitly control permission checks/requests.
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin) => {
+    const isLocalApp = String(requestingOrigin || '').startsWith('file://');
+    if (!isLocalApp) return false;
+    if (permission === 'microphone') return microphonePermissionDecision === 'granted';
+    if (permission === 'geolocation') return true;
+    return false;
+  });
+
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
     const requestingUrl = String(details?.requestingUrl || '');
     const isLocalApp = requestingUrl.startsWith('file://');
-    const allowedPermissions = new Set(['microphone', 'geolocation']);
-    callback(isLocalApp && allowedPermissions.has(permission));
+    if (!isLocalApp) {
+      callback(false);
+      return;
+    }
+
+    if (permission === 'microphone') {
+      void promptMicrophonePermission().then((granted) => callback(granted));
+      return;
+    }
+
+    if (permission === 'geolocation') {
+      callback(true);
+      return;
+    }
+
+    callback(false);
   });
 
   // Security: enforce CSP at runtime for all responses/subresources.
@@ -169,6 +420,10 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   registerShortcuts();
+
+  // Ironclad lifecycle: clear stale listeners before clean service boot.
+  await cleanupGhostListeners();
+  startOllama();
   pythonBridge.start();
 
   if (app.isPackaged) {
@@ -192,17 +447,20 @@ app.whenReady().then(() => {
     }
   }
 
-  setInterval(broadcastBackendStatus, 5000);
+  backendStatusInterval = setInterval(broadcastBackendStatus, 3000);
+  serviceHealthInterval = setInterval(refreshServiceHealth, 2500);
+  await refreshServiceHealth();
 });
 
 app.on('window-all-closed', () => {
-  pythonBridge.stop();
+  shutdownServices();
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('before-quit', () => {
+  isQuitting = true;
   globalShortcut.unregisterAll();
-  pythonBridge.stop();
+  shutdownServices();
   if (tray) { tray.destroy(); tray = null; }
 });
 
@@ -256,7 +514,7 @@ function createTray() {
       {
         label: '❌ Quit JARVIS',
         click: () => {
-          pythonBridge.stop();
+          shutdownServices();
           app.quit();
         },
       },
