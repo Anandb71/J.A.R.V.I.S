@@ -49,6 +49,7 @@ class JarvisApp {
   /** ── Boot Sequence ──────────────────────────────────────────── */
   async boot() {
     this._cacheDOM();
+    this._initHealthMatrix();
     this._startClock();
 
     // Initialize sub-systems
@@ -87,7 +88,11 @@ class JarvisApp {
       backendStatus: document.getElementById('backend-status'),
       voiceState: document.getElementById('voice-state'),
       wsStatus: document.getElementById('ws-status'),
+      modeStatus: document.getElementById('mode-status'),
       latencyDisplay: document.getElementById('latency-display'),
+      healthDotUi: document.getElementById('hm-ui'),
+      healthDotApi: document.getElementById('hm-api'),
+      healthDotAi: document.getElementById('hm-ai'),
       threeCanvas: document.getElementById('three-canvas'),
       collapseLeft: document.getElementById('btn-collapse-left'),
       collapseRight: document.getElementById('btn-collapse-right'),
@@ -192,6 +197,7 @@ class JarvisApp {
         }
         break;
       case 'brain:done':
+        this._setModeStatus(Boolean(payload.stark_mode));
         if (this._assistantBuffer.trim()) {
           const assistantText = this._sanitizeAssistantText(this._assistantBuffer);
           this.chat.add('assistant', assistantText);
@@ -219,6 +225,9 @@ class JarvisApp {
           const out = typeof payload.result === 'string' ? payload.result : JSON.stringify(payload.result, null, 2);
           this.chat.add('tool', `✓ ${payload.tool_name}: ${out.substring(0, 300)}`);
         }
+        break;
+      case 'brain:mode':
+        this._setModeStatus(Boolean(payload.stark_mode));
         break;
 
       // Voice events
@@ -493,6 +502,13 @@ class JarvisApp {
   async _toggleVoice() {
     if (!this.voiceClient) {
       try {
+        if (window.jarvis?.requestMicrophoneAccess) {
+          const mic = await window.jarvis.requestMicrophoneAccess();
+          if (!mic?.granted) {
+            throw new Error('Microphone permission denied');
+          }
+        }
+
         if (!this.ws) {
           this._connectWebSocket();
         }
@@ -523,7 +539,9 @@ class JarvisApp {
       } catch (err) {
         const msg = String(err?.message || err || 'unknown error');
         if (/permission denied|notallowederror|permission/i.test(msg)) {
-          this.chat.add('error', 'Voice init failed: Microphone permission denied. Enable Windows Microphone access for desktop apps, then restart JARVIS.');
+          this.chat.add('error', 'Voice init failed: Microphone permission denied. Allow access in JARVIS prompt and ensure Windows > Privacy > Microphone allows desktop apps.');
+        } else if (/found|device|input/i.test(msg)) {
+          this.chat.add('error', 'Voice init failed: No usable microphone device was found. Check your default input device in Windows sound settings.');
         } else {
           this.chat.add('error', `Voice init failed: ${msg}`);
         }
@@ -603,8 +621,7 @@ class JarvisApp {
 
     const leakedToolCall = cleaned.match(/action\s*=\s*['\"]?tool_call['\"]?.*tool_name\s*=\s*['\"]?([a-zA-Z0-9_:-]+)['\"]?/i);
     if (leakedToolCall) {
-      const tool = leakedToolCall[1] || 'requested tool';
-      return `I attempted to run ${tool}, but the model response format leaked internal markup. Please retry the request once.`;
+      return 'I couldn’t complete that action cleanly. Please retry once with a clearer command.';
     }
 
     const m = cleaned.match(/action\s*=\s*['\"]?direct_response['\"]?\s+response\s*=\s*([\s\S]+)/i);
@@ -686,6 +703,67 @@ class JarvisApp {
     if (!el) return;
     el.style.color = connected ? 'var(--green)' : 'var(--red)';
     el.textContent = connected ? 'WS: ●' : 'WS: ○';
+  }
+
+  _setModeStatus(enabled) {
+    const el = this.dom.modeStatus;
+    if (!el) return;
+    if (enabled) {
+      el.textContent = 'MODE: STARK';
+      el.classList.add('stark');
+    } else {
+      el.textContent = 'MODE: NORMAL';
+      el.classList.remove('stark');
+    }
+  }
+
+  _initHealthMatrix() {
+    this._setHealthDot(this.dom.healthDotUi, 'ok');
+    this._setHealthDot(this.dom.healthDotApi, 'warn');
+    this._setHealthDot(this.dom.healthDotAi, 'warn');
+
+    if (window.jarvis?.onServiceHealth) {
+      window.jarvis.onServiceHealth((payload) => {
+        this._applyServiceHealth(payload || {});
+      });
+    }
+
+    if (window.jarvis?.getServiceHealth) {
+      window.jarvis.getServiceHealth().then((payload) => {
+        this._applyServiceHealth(payload || {});
+      }).catch(() => {
+        // no-op
+      });
+    }
+  }
+
+  _healthStateFromProbe(up, latencyMs) {
+    if (!up) return 'dead';
+    if (typeof latencyMs === 'number' && latencyMs > 800) return 'warn';
+    return 'ok';
+  }
+
+  _setHealthDot(dotEl, state) {
+    if (!dotEl) return;
+    dotEl.classList.remove('ok', 'warn', 'dead');
+    dotEl.classList.add(state);
+  }
+
+  _applyServiceHealth(payload) {
+    const uiState = this._healthStateFromProbe(Boolean(payload?.ui?.up), payload?.ui?.latencyMs);
+    const apiState = this._healthStateFromProbe(Boolean(payload?.api?.up), payload?.api?.latencyMs);
+    const aiState = this._healthStateFromProbe(Boolean(payload?.ai?.up), payload?.ai?.latencyMs);
+
+    this._setHealthDot(this.dom.healthDotUi, uiState);
+    this._setHealthDot(this.dom.healthDotApi, apiState);
+    this._setHealthDot(this.dom.healthDotAi, aiState);
+
+    if (payload?.api?.up) {
+      const detail = typeof payload?.api?.latencyMs === 'number' ? `${payload.api.latencyMs}ms` : 'online';
+      this._updateBackendPill('online', detail);
+    } else {
+      this._updateBackendPill('error', 'offline');
+    }
   }
 
   /** ── Utilities ──────────────────────────────────────────────── */
