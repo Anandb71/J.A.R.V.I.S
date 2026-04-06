@@ -83,24 +83,24 @@ class PythonBridge {
     if (!this.process) return;
 
     this.intentionalStop = true;
+    const pid = this.process.pid;
     if (process.platform === 'win32') {
-      this.process.kill('SIGINT');
-    } else {
-      this.process.kill('SIGTERM');
+      if (pid) {
+        spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
+          stdio: 'ignore',
+          shell: false,
+        });
+      }
+      this.process = null;
+      return;
     }
 
+    this.process.kill('SIGTERM');
     setTimeout(() => {
       if (this.process) {
-        if (process.platform === 'win32') {
-          spawn('taskkill', ['/PID', String(this.process.pid), '/T', '/F'], {
-            stdio: 'ignore',
-            shell: false,
-          });
-        } else {
-          this.process.kill('SIGKILL');
-        }
+        this.process.kill('SIGKILL');
       }
-    }, 3000);
+    }, 1500);
   }
 }
 
