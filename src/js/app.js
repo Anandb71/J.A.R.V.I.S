@@ -44,6 +44,8 @@ class JarvisApp {
     this._assistantBuffer = '';
     this._weatherTimer = null;
     this._textChatVoiceReplyEnabled = true;
+    this._armorTelemetryState = 'nominal';
+    this._armorDiagnosticsState = 'ok';
   }
 
   /** ── Boot Sequence ──────────────────────────────────────────── */
@@ -96,6 +98,8 @@ class JarvisApp {
       threeCanvas: document.getElementById('three-canvas'),
       collapseLeft: document.getElementById('btn-collapse-left'),
       collapseRight: document.getElementById('btn-collapse-right'),
+      armorBusState: document.getElementById('armor-bus-state'),
+      armorModule: document.getElementById('armor-signature-module'),
     };
   }
 
@@ -181,6 +185,7 @@ class JarvisApp {
       case 'system:metrics':
         this.gauges.update(payload);
         this._updateStressLevel(payload);
+        this._updateArmorTelemetry(payload);
         break;
 
       // Brain events
@@ -678,6 +683,52 @@ class JarvisApp {
     }
   }
 
+  _updateArmorTelemetry(metrics) {
+    const clamp = (n) => Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0));
+
+    const cpu = clamp(metrics?.cpu_percent);
+    const gpu = clamp(metrics?.gpu_percent);
+    const ram = clamp(metrics?.ram_percent);
+    const load = Math.max(cpu, gpu, ram);
+
+    const thermalC = Math.round(34 + load * 0.56);
+    const thermalState = thermalC >= 84 ? 'critical' : thermalC >= 74 ? 'combat' : thermalC >= 62 ? 'elevated' : 'nominal';
+    const loadState = load >= 92 ? 'critical' : load >= 78 ? 'combat' : load >= 55 ? 'elevated' : 'nominal';
+    const baseState = (thermalState === 'critical' || loadState === 'critical')
+      ? 'critical'
+      : (thermalState === 'combat' || loadState === 'combat')
+        ? 'combat'
+        : (thermalState === 'elevated' || loadState === 'elevated')
+          ? 'elevated'
+          : 'nominal';
+
+    this._armorTelemetryState = baseState;
+    const themeState = this._resolveArmorTheme(baseState);
+    this._applyArmorTheme(themeState);
+
+    if (this.dom.armorBusState) {
+      const labels = {
+        nominal: `NOMINAL · ${thermalC}°C`,
+        elevated: `ELEVATED · ${thermalC}°C`,
+        combat: `COMBAT · ${thermalC}°C`,
+        critical: `OVERDRIVE · ${thermalC}°C`,
+        degraded: `DEGRADED · ${thermalC}°C`,
+      };
+      this.dom.armorBusState.textContent = labels[themeState] || 'NOMINAL';
+    }
+  }
+
+  _resolveArmorTheme(baseState) {
+    if (this._armorDiagnosticsState === 'dead') return 'critical';
+    if (this._armorDiagnosticsState === 'warn' && baseState === 'nominal') return 'degraded';
+    return baseState;
+  }
+
+  _applyArmorTheme(theme) {
+    if (!this.dom.armorModule) return;
+    this.dom.armorModule.dataset.theme = theme;
+  }
+
   /** ── Tool Confirmation ──────────────────────────────────────── */
   _showConfirmation(payload) {
     const msg = `JARVIS wants to run: ${payload.tool_name}\nArguments: ${JSON.stringify(payload.arguments)}\nReason: ${payload.reason}`;
@@ -757,6 +808,10 @@ class JarvisApp {
     this._setHealthDot(this.dom.healthDotUi, uiState);
     this._setHealthDot(this.dom.healthDotApi, apiState);
     this._setHealthDot(this.dom.healthDotAi, aiState);
+
+    const states = [uiState, apiState, aiState];
+    this._armorDiagnosticsState = states.includes('dead') ? 'dead' : states.includes('warn') ? 'warn' : 'ok';
+    this._applyArmorTheme(this._resolveArmorTheme(this._armorTelemetryState));
 
     if (payload?.api?.up) {
       const detail = typeof payload?.api?.latencyMs === 'number' ? `${payload.api.latencyMs}ms` : 'online';
