@@ -1,5 +1,4 @@
 import * as THREE from '../../../node_modules/three/build/three.module.js';
-import { SVGLoader } from '../../../node_modules/three/examples/jsm/loaders/SVGLoader.js';
 
 const TIER_CONFIG = {
   high: { orb: 5000, ambient: 3000, bloom: true, bloomStrength: 0.6, rings: 3, minFps: 50 },
@@ -12,7 +11,6 @@ const SUIT_BASE_Y = -1.04;
 const SUIT_BASE_Z = -0.24;
 const SUIT_BASE_ROT_Y = -0.28;
 const SUIT_BASE_SCALE = 1.2;
-const MASK_SVG_URL = new URL('../../../superhero-mask-with-futuristic-design-for-coloring-and-crafting-projects-vector.svg', import.meta.url).href;
 
 let renderer;
 let scene;
@@ -21,11 +19,6 @@ let orb;
 let halo;
 let rings = [];
 let ambient;
-let suitGroup;
-let suitOutline;
-let suitCore;
-let suitVisor;
-let suitMaterials = [];
 let state = 'idle';
 let audioLevel = 0;
 let stressLevel = 0;
@@ -92,7 +85,6 @@ function buildScene() {
   scene.clear();
   rings.forEach((ring) => scene.remove(ring));
   rings = [];
-  suitMaterials = [];
 
   const orbGeometry = new THREE.BufferGeometry();
   const positions = new Float32Array(config.orb * 3);
@@ -198,132 +190,6 @@ function buildScene() {
   ambGeometry.setAttribute('position', new THREE.BufferAttribute(ambPositions, 3));
   ambient = new THREE.Points(ambGeometry, new THREE.PointsMaterial({ color: 0x7dcfff, size: 0.02, transparent: true, opacity: 0.6 }));
   scene.add(ambient);
-
-  buildSideMaskPanel();
-}
-
-function buildSideMaskPanel() {
-  suitGroup = new THREE.Group();
-  suitGroup.position.set(SUIT_BASE_X, SUIT_BASE_Y, SUIT_BASE_Z);
-  suitGroup.rotation.y = SUIT_BASE_ROT_Y;
-  suitGroup.scale.setScalar(SUIT_BASE_SCALE);
-
-  const backplate = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.55, 2.25),
-    new THREE.MeshBasicMaterial({
-      color: 0x0b2034,
-      transparent: true,
-      opacity: 0.36,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    }),
-  );
-  backplate.position.set(0, 0.52, -0.02);
-  suitGroup.add(backplate);
-
-  suitCore = new THREE.Mesh(
-    new THREE.RingGeometry(0.085, 0.13, 24),
-    new THREE.MeshBasicMaterial({
-      color: 0x7adfff,
-      transparent: true,
-      opacity: 0.95,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    }),
-  );
-  suitCore.position.set(0, -0.12, 0.04);
-  suitGroup.add(suitCore);
-
-  suitVisor = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.34, 0.05),
-    new THREE.MeshBasicMaterial({
-      color: 0xb9efff,
-      transparent: true,
-      opacity: 0.85,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    }),
-  );
-  suitVisor.position.set(0, 0.82, 0.05);
-  suitGroup.add(suitVisor);
-
-  const edgeGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.55, 2.25));
-  suitOutline = new THREE.LineSegments(
-    edgeGeo,
-    new THREE.LineBasicMaterial({ color: 0x3bbaff, transparent: true, opacity: 0.22 }),
-  );
-  suitOutline.position.set(0, 0.52, 0.06);
-  suitGroup.add(suitOutline);
-
-  scene.add(suitGroup);
-
-  loadMaskSvgGeometry(MASK_SVG_URL)
-    .then((svgGroup) => {
-      if (!suitGroup) return;
-      suitGroup.add(svgGroup);
-    })
-    .catch(() => {
-      // keep backplate only if SVG cannot load
-    });
-}
-
-async function loadMaskSvgGeometry(url) {
-  const svgText = await fetch(url).then((res) => {
-    if (!res.ok) throw new Error(`svg_fetch_${res.status}`);
-    return res.text();
-  });
-
-  const loader = new SVGLoader();
-  const data = loader.parse(svgText);
-  const group = new THREE.Group();
-
-  data.paths.forEach((path) => {
-    const style = path.userData?.style || {};
-
-    const shapes = SVGLoader.createShapes(path);
-    shapes.forEach((shape) => {
-      const fillMat = new THREE.MeshBasicMaterial({
-        color: 0xff4568,
-        transparent: true,
-        opacity: 0.1,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending,
-      });
-      suitMaterials.push(fillMat);
-      const fillMesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), fillMat);
-      group.add(fillMesh);
-    });
-
-    path.subPaths.forEach((subPath) => {
-      const strokeGeometry = SVGLoader.pointsToStroke(subPath.getPoints(), style);
-      if (!strokeGeometry) return;
-      const strokeMat = new THREE.MeshBasicMaterial({
-        color: 0xff3a5a,
-        transparent: true,
-        opacity: 0.95,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending,
-      });
-      suitMaterials.push(strokeMat);
-      group.add(new THREE.Mesh(strokeGeometry, strokeMat));
-    });
-  });
-
-  const box = new THREE.Box3().setFromObject(group);
-  const size = new THREE.Vector3();
-  const center = new THREE.Vector3();
-  box.getSize(size);
-  box.getCenter(center);
-
-  const maxDim = Math.max(size.x, size.y, 1);
-  const scale = 1.25 / maxDim;
-  group.scale.setScalar(scale);
-  group.position.set(-center.x * scale, -center.y * scale + 0.62, 0.05);
-  group.rotation.z = Math.PI;
-
-  return group;
 }
 
 function rebuild(nextTier) {
@@ -428,43 +294,6 @@ function render(now) {
   if (halo) {
     halo.rotation.y += 0.0012;
     halo.scale.setScalar(1.0 + audioLevel * 0.06);
-  }
-
-  if (suitGroup) {
-    const pulse = 1 + Math.sin(time * (1.4 + stressLevel * 2.6)) * 0.018;
-    suitGroup.scale.setScalar(SUIT_BASE_SCALE * pulse * (1 + audioLevel * 0.04));
-    suitGroup.rotation.y = SUIT_BASE_ROT_Y + Math.sin(time * 0.42) * 0.04;
-
-    if (state === 'speaking') {
-      suitGroup.position.y = SUIT_BASE_Y + Math.sin(time * 2.0) * 0.03;
-    } else {
-      suitGroup.position.y += (SUIT_BASE_Y - suitGroup.position.y) * 0.12;
-    }
-
-    const calm = new THREE.Color('#38bfff');
-    const alert = new THREE.Color('#ff3e64');
-    const tint = calm.clone().lerp(alert, Math.min(1, stressLevel * 1.2));
-
-    if (suitCore?.material) {
-      suitCore.material.color.copy(tint);
-      suitCore.material.opacity = 0.72 + stressLevel * 0.22 + audioLevel * 0.2;
-      suitCore.rotation.z += 0.016 + stressLevel * 0.03;
-    }
-
-    if (suitVisor?.material) {
-      suitVisor.material.color.copy(tint.clone().lerp(new THREE.Color('#ffffff'), 0.25));
-      suitVisor.material.opacity = 0.62 + stressLevel * 0.25;
-    }
-
-    if (suitOutline?.material) {
-      suitOutline.material.color.copy(tint);
-      suitOutline.material.opacity = 0.12 + stressLevel * 0.25;
-    }
-
-    suitMaterials.forEach((mat, idx) => {
-      mat.color.copy(tint.clone().lerp(new THREE.Color('#ffde6f'), idx % 2 ? 0.14 : 0.06));
-      mat.opacity = Math.min(1, 0.2 + stressLevel * 0.55 + audioLevel * 0.2);
-    });
   }
 
   renderer.render(scene, camera);
