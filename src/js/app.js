@@ -99,6 +99,8 @@ class JarvisApp {
       collapseLeft: document.getElementById('btn-collapse-left'),
       collapseRight: document.getElementById('btn-collapse-right'),
       armorBusState: document.getElementById('armor-bus-state'),
+      armorGpuTemp: document.getElementById('armor-gpu-temp'),
+      armorCpuTemp: document.getElementById('armor-cpu-temp'),
       armorModule: document.getElementById('armor-signature-module'),
     };
   }
@@ -692,6 +694,8 @@ class JarvisApp {
     const load = Math.max(cpu, gpu, ram);
 
     const thermalC = Math.round(34 + load * 0.56);
+    const gpuTemp = Math.round(37 + gpu * 0.57);
+    const cpuTemp = Math.round(35 + cpu * 0.54);
     const thermalState = thermalC >= 84 ? 'critical' : thermalC >= 74 ? 'combat' : thermalC >= 62 ? 'elevated' : 'nominal';
     const loadState = load >= 92 ? 'critical' : load >= 78 ? 'combat' : load >= 55 ? 'elevated' : 'nominal';
     const baseState = (thermalState === 'critical' || loadState === 'critical')
@@ -708,13 +712,21 @@ class JarvisApp {
 
     if (this.dom.armorBusState) {
       const labels = {
-        nominal: `NOMINAL · ${thermalC}°C`,
-        elevated: `ELEVATED · ${thermalC}°C`,
-        combat: `COMBAT · ${thermalC}°C`,
-        critical: `OVERDRIVE · ${thermalC}°C`,
-        degraded: `DEGRADED · ${thermalC}°C`,
+        nominal: 'NOMINAL',
+        elevated: 'ELEVATED',
+        combat: 'COMBAT',
+        critical: 'OVERDRIVE',
+        degraded: 'DEGRADED',
       };
       this.dom.armorBusState.textContent = labels[themeState] || 'NOMINAL';
+    }
+
+    if (this.dom.armorGpuTemp) {
+      this.dom.armorGpuTemp.textContent = `GPU - ${gpuTemp}°C`;
+    }
+
+    if (this.dom.armorCpuTemp) {
+      this.dom.armorCpuTemp.textContent = `CPU - ${cpuTemp}°C`;
     }
   }
 

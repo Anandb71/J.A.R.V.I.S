@@ -149,14 +149,22 @@
         </div>
         <div id="armor-signature-module" class="mask-module" data-theme="nominal" aria-label="Mask visual module">
           <div class="mask-module-title">Armor Signature</div>
-          <img
-            class="mask-module-image"
-            src="../superhero-mask-with-futuristic-design-for-coloring-and-crafting-projects-vector.svg"
-            alt="Superhero mask"
-            loading="eager"
-            decoding="async"
-          />
-          <div id="armor-bus-state" class="armor-status-float">NOMINAL</div>
+          <div class="mask-visual-wrap">
+            <img
+              class="mask-module-image"
+              src="../superhero-mask-with-futuristic-design-for-coloring-and-crafting-projects-vector.svg"
+              alt="Superhero mask"
+              loading="eager"
+              decoding="async"
+            />
+            <div class="armor-status-side" aria-label="Armor live status">
+              <div id="armor-bus-state" class="armor-status-float">NOMINAL</div>
+              <div class="armor-side-temps">
+                <span id="armor-gpu-temp">GPU - --°C</span>
+                <span id="armor-cpu-temp">CPU - --°C</span>
+              </div>
+            </div>
+          </div>
         </div>
         <div id="chat-panel" class="chat-panel"></div>
         <div class="chat-input-wrap">
