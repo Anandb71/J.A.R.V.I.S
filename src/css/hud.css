@@ -713,13 +713,12 @@
 .mask-module {
   --armor-accent: #63ccff;
   --armor-accent-soft: rgba(99, 204, 255, 0.28);
+  --armor-bg-flat: #2f667f;
   margin-bottom: 8px;
   padding: 10px 10px 12px;
   border-radius: 12px;
   border: 2px solid var(--armor-accent-soft);
-  background:
-    radial-gradient(circle at 50% 20%, rgba(70, 177, 255, 0.2), transparent 62%),
-    linear-gradient(180deg, rgba(6, 24, 39, 0.82), rgba(3, 12, 21, 0.88));
+  background: var(--armor-bg-flat);
   box-shadow: inset 0 0 28px rgba(52, 163, 255, 0.2), 0 0 24px rgba(13, 105, 179, 0.24);
   display: grid;
   gap: 8px;
@@ -744,6 +743,15 @@
 }
 
 .mask-module-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 187, 229, 0.32);
+  background: linear-gradient(180deg, rgba(12, 44, 72, 0.92), rgba(7, 27, 44, 0.92));
   font-size: 11px;
   letter-spacing: 0.12em;
   font-weight: 700;
@@ -751,6 +759,7 @@
   color: var(--armor-accent);
   text-align: center;
   text-shadow: 0 0 12px var(--armor-accent-soft);
+  box-shadow: inset 0 0 14px rgba(58, 145, 208, 0.14);
 }
 
 .mask-module-image {
@@ -777,14 +786,17 @@
   min-width: 118px;
   padding: 8px 8px;
   border-radius: 10px;
-  border: 1px solid var(--armor-accent-soft);
-  background: rgba(4, 15, 25, 0.64);
+  border: 1px solid rgba(110, 187, 229, 0.32);
+  background: linear-gradient(180deg, rgba(12, 44, 72, 0.92), rgba(7, 27, 44, 0.92));
+  box-shadow: inset 0 0 14px rgba(58, 145, 208, 0.14);
+  position: relative;
+  z-index: 3;
 }
 
 .armor-status-float {
   position: static;
   transform: none;
-  z-index: 3;
+  z-index: 4;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -794,6 +806,12 @@
   pointer-events: none;
   white-space: nowrap;
   text-align: center;
+  position: relative;
+  justify-self: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(8, 31, 52, 0.92);
+  border: 1px solid rgba(99, 204, 255, 0.22);
 }
 
 .armor-side-temps {
@@ -804,10 +822,14 @@
   text-transform: uppercase;
   color: #a9defb;
   font-family: 'Cascadia Mono', 'Consolas', monospace;
+  position: relative;
+  z-index: 4;
 }
 
 .armor-side-temps span {
   text-align: center;
+  position: relative;
+  z-index: 4;
 }
 
 .mask-module[data-theme="nominal"] {
