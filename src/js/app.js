@@ -46,11 +46,30 @@ class JarvisApp {
     this._textChatVoiceReplyEnabled = true;
     this._armorTelemetryState = 'nominal';
     this._armorDiagnosticsState = 'ok';
+    this._clickthroughUi = false;
+    this._aiEra = 'jarvis';
+    this._telemetryPulseTimer = null;
+    this._lastTelemetryPulseAt = 0;
+    this._lastStressBand = null;
+    this._exprRaf = null;
+    this._exprStartTs = 0;
+    this._audioLevelTarget = 0;
+    this._audioLevel = 0;
+    this._nullAnchor = { x: 0, y: 0 };
+    this._nullAnchorTarget = { x: 0, y: 0 };
+    this._codeStreamTimer = null;
   }
 
   /** ── Boot Sequence ──────────────────────────────────────────── */
   async boot() {
     this._cacheDOM();
+    document.body.classList.add('startup-sequence');
+    this._setAiEra('jarvis');
+    if (this.dom.hudRoot) {
+      this.dom.hudRoot.classList.add('booted');
+    }
+    this._bootLog('Calibrating arc-core…');
+    await this._runStartupSequence();
     this._initHealthMatrix();
     this._startClock();
 
@@ -60,11 +79,18 @@ class JarvisApp {
 
     this.gauges.init();
     this._initThreeJs();
+    this._initCinematicHudRig();
+    this._startCodeStream();
+    this._startExpressionRig();
 
     // Start WebSocket
     this._connectWebSocket();
+    this._bootLog('Linking tactical bus…');
+    await this._sleep(120);
 
     // Complete boot
+    this._bootLog('J.A.R.V.I.S. online');
+    await this._sleep(160);
     this._completeBoot();
     this._bindUI();
     this._startWeatherLoop();
@@ -76,6 +102,7 @@ class JarvisApp {
     this.dom = {
       bootOverlay: document.getElementById('boot-overlay'),
       bootLog: document.getElementById('boot-log'),
+      bootProgressFill: document.getElementById('boot-progress-fill'),
       hudRoot: document.getElementById('hud-root'),
       clock: document.getElementById('clock'),
       calendar: document.getElementById('calendar'),
@@ -102,6 +129,9 @@ class JarvisApp {
       armorGpuTemp: document.getElementById('armor-gpu-temp'),
       armorCpuTemp: document.getElementById('armor-cpu-temp'),
       armorModule: document.getElementById('armor-signature-module'),
+      codeStream: document.getElementById('code-stream'),
+      particleFlow: document.getElementById('particle-flow'),
+      centerPanel: document.querySelector('.center-panel'),
     };
   }
 
@@ -112,13 +142,58 @@ class JarvisApp {
     }
   }
 
+  async _runStartupSequence() {
+    const steps = [
+      ['Locking cockpit frame…', 0.12, 'phase-1', 560, 'jarvis'],
+      ['Docking top and bottom rails…', 0.28, 'phase-2', 620, 'jarvis'],
+      ['Latching side armor modules…', 0.46, 'phase-3', 700, 'jarvis'],
+      ['Spinning reactor core lattice…', 0.66, 'phase-4', 760, 'friday'],
+      ['Synchronizing fluid telemetry bus…', 0.84, 'phase-5', 760, 'friday'],
+      ['Tactical overlay acquisition online.', 1, 'phase-6', 700, 'edith'],
+    ];
+
+    for (const [label, progress, phase, dwellMs, era] of steps) {
+      this._setBootPhase(phase);
+      this._setAiEra(era);
+      this._bootLog(label);
+      if (this.dom.bootProgressFill) {
+        this.dom.bootProgressFill.style.width = `${Math.round(progress * 100)}%`;
+      }
+      await this._sleep(dwellMs);
+    }
+
+    this._setBootPhase('complete');
+  }
+
+  _setBootPhase(phase) {
+    if (!this.dom.bootOverlay) return;
+    this.dom.bootOverlay.dataset.phase = phase;
+    document.body.dataset.startupPhase = phase;
+    if (this.dom.hudRoot) {
+      this.dom.hudRoot.dataset.startupPhase = phase;
+    }
+  }
+
+  _setAiEra(era) {
+    this._aiEra = era;
+    document.body.dataset.aiEra = era;
+    if (this.dom.hudRoot) {
+      this.dom.hudRoot.dataset.aiEra = era;
+    }
+  }
+
   /** Complete boot — hide overlay, show HUD */
   _completeBoot() {
     this.booted = true;
+    this._applyUiMode(false);
+    this._setAiEra('jarvis');
+    document.body.classList.remove('startup-sequence');
+    delete document.body.dataset.startupPhase;
     if (this.dom.bootOverlay) {
       this.dom.bootOverlay.classList.add('hidden');
     }
     if (this.dom.hudRoot) {
+      delete this.dom.hudRoot.dataset.startupPhase;
       this.dom.hudRoot.classList.add('booted');
     }
   }
@@ -188,6 +263,7 @@ class JarvisApp {
         this.gauges.update(payload);
         this._updateStressLevel(payload);
         this._updateArmorTelemetry(payload);
+        this._triggerTelemetryPulse(payload);
         break;
 
       // Brain events
@@ -357,7 +433,11 @@ class JarvisApp {
     // Click-through toggle
     this.dom.btnClickthrough?.addEventListener('click', () => {
       if (window.jarvis?.toggleClickThrough) {
-        window.jarvis.toggleClickThrough();
+        window.jarvis.toggleClickThrough().then((result) => {
+          this._applyUiMode(Boolean(result?.clickThrough));
+        }).catch(() => {
+          this._applyUiMode(!this._clickthroughUi);
+        });
       }
     });
 
@@ -368,8 +448,12 @@ class JarvisApp {
 
     // Main-process Ctrl+K shortcut event
     if (window.jarvis?.onToggleFocusShortcut) {
-      window.jarvis.onToggleFocusShortcut(() => {
-        document.body.classList.toggle('hud-focus');
+      window.jarvis.onToggleFocusShortcut((payload) => {
+        if (payload && typeof payload.clickThrough === 'boolean') {
+          this._applyUiMode(payload.clickThrough);
+          return;
+        }
+        this._applyUiMode(!this._clickthroughUi);
       });
     }
 
@@ -538,6 +622,7 @@ class JarvisApp {
             if (this.threeWorker) {
               this.threeWorker.postMessage({ type: 'set_audio_level', level });
             }
+            this._audioLevelTarget = Math.max(0, Math.min(1, Number(level) || 0));
           },
         );
         await this.voiceClient.start();
@@ -557,6 +642,7 @@ class JarvisApp {
       this.voiceClient.stop();
       this.voiceClient = null;
       this.audioTransport = null;
+      this._audioLevelTarget = 0;
       this.dom.btnMic?.classList.remove('primary');
       this._setVoiceState('idle');
       this.chat.addSystem('Voice deactivated.');
@@ -666,6 +752,9 @@ class JarvisApp {
 
     el.textContent = state;
     el.setAttribute('data-state', state);
+    el.classList.remove('voice-state-ping');
+    void el.offsetWidth;
+    el.classList.add('voice-state-ping');
 
     // Update Three.js worker
     if (this.threeWorker) {
@@ -759,6 +848,9 @@ class JarvisApp {
     if (!el) return;
     el.className = `status-pill ${status}`;
     el.textContent = `Backend: ${label}`;
+    el.classList.remove('pulse-notify');
+    void el.offsetWidth;
+    el.classList.add('pulse-notify');
   }
 
   _updateWsStatus(connected) {
@@ -766,6 +858,9 @@ class JarvisApp {
     if (!el) return;
     el.style.color = connected ? 'var(--green)' : 'var(--red)';
     el.textContent = connected ? 'WS: ●' : 'WS: ○';
+    el.classList.remove('pulse-notify');
+    void el.offsetWidth;
+    el.classList.add('pulse-notify');
   }
 
   _setModeStatus(enabled) {
@@ -778,6 +873,151 @@ class JarvisApp {
       el.textContent = 'MODE: NORMAL';
       el.classList.remove('stark');
     }
+  }
+
+  _applyUiMode(clickthroughEnabled) {
+    this._clickthroughUi = Boolean(clickthroughEnabled);
+    document.body.classList.add('ui-mode-switch');
+    setTimeout(() => document.body.classList.remove('ui-mode-switch'), 460);
+    document.body.classList.toggle('clickthrough-ui', this._clickthroughUi);
+    document.body.classList.toggle('normal-ui', !this._clickthroughUi);
+  }
+
+  _triggerTelemetryPulse(metrics) {
+    if (!this.dom.hudRoot) return;
+
+    const cpu = Number(metrics?.cpu_percent || 0);
+    const gpu = Number(metrics?.gpu_percent || 0);
+    const ram = Number(metrics?.ram_percent || 0);
+    const stress = Math.max(cpu, gpu, ram);
+
+    const stressBand = stress >= 92
+      ? 'critical'
+      : stress >= 80
+        ? 'high'
+        : stress >= 60
+          ? 'medium'
+          : 'low';
+
+    const now = Date.now();
+    const elapsed = now - this._lastTelemetryPulseAt;
+    const bandChanged = stressBand !== this._lastStressBand;
+    const shouldPulse = bandChanged || (stress >= 88 && elapsed > 1400) || elapsed > 9000;
+
+    this._lastStressBand = stressBand;
+
+    if (!shouldPulse) {
+      return;
+    }
+
+    this._lastTelemetryPulseAt = now;
+
+    this.dom.hudRoot.classList.remove('telemetry-pulse');
+    void this.dom.hudRoot.offsetWidth;
+    this.dom.hudRoot.classList.add('telemetry-pulse');
+    if (stress >= 90) {
+      this._setAiEra('edith');
+    } else if (stress >= 68) {
+      this._setAiEra('friday');
+    } else {
+      this._setAiEra('jarvis');
+    }
+
+    this.dom.hudRoot.classList.toggle('stress-shock', stress >= 88);
+
+    if (this._telemetryPulseTimer) {
+      clearTimeout(this._telemetryPulseTimer);
+    }
+    this._telemetryPulseTimer = setTimeout(() => {
+      this.dom.hudRoot?.classList.remove('telemetry-pulse');
+      this.dom.hudRoot?.classList.remove('stress-shock');
+      this._telemetryPulseTimer = null;
+    }, 460);
+  }
+
+  _initCinematicHudRig() {
+    if (this.dom.particleFlow && !this.dom.particleFlow.childElementCount) {
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < 48; i += 1) {
+        const p = document.createElement('span');
+        p.className = 'p';
+        p.style.setProperty('--x', `${Math.random() * 100}%`);
+        p.style.setProperty('--y', `${Math.random() * 100}%`);
+        p.style.setProperty('--d', `${1.8 + Math.random() * 4.6}s`);
+        p.style.setProperty('--s', `${0.45 + Math.random() * 1.15}`);
+        p.style.setProperty('--a', `${0.25 + Math.random() * 0.65}`);
+        frag.appendChild(p);
+      }
+      this.dom.particleFlow.appendChild(frag);
+    }
+
+    window.addEventListener('pointermove', (e) => {
+      const nx = (e.clientX / window.innerWidth) * 2 - 1;
+      const ny = (e.clientY / window.innerHeight) * 2 - 1;
+      this._nullAnchorTarget.x = nx;
+      this._nullAnchorTarget.y = ny;
+    });
+  }
+
+  _startExpressionRig() {
+    this._exprStartTs = performance.now();
+    const step = (ts) => {
+      const t = (ts - this._exprStartTs) / 1000;
+      this._nullAnchor.x += (this._nullAnchorTarget.x - this._nullAnchor.x) * 0.08;
+      this._nullAnchor.y += (this._nullAnchorTarget.y - this._nullAnchor.y) * 0.08;
+      this._audioLevel += (this._audioLevelTarget - this._audioLevel) * 0.18;
+
+      const audioBoost = 1 + this._audioLevel * 1.9;
+      const ringSpeed = (1.0 + audioBoost * 0.72).toFixed(3);
+      const sweepSpeed = (1.0 + audioBoost * 0.35).toFixed(3);
+
+      if (this.dom.hudRoot) {
+        this.dom.hudRoot.style.setProperty('--expr-t', `${t.toFixed(3)}s`);
+        this.dom.hudRoot.style.setProperty('--expr-ring-speed', ringSpeed);
+        this.dom.hudRoot.style.setProperty('--expr-sweep-speed', sweepSpeed);
+        this.dom.hudRoot.style.setProperty('--null-x', `${(this._nullAnchor.x * 16).toFixed(2)}px`);
+        this.dom.hudRoot.style.setProperty('--null-y', `${(this._nullAnchor.y * 12).toFixed(2)}px`);
+        this.dom.hudRoot.style.setProperty('--audio-level', this._audioLevel.toFixed(3));
+      }
+
+      this._exprRaf = requestAnimationFrame(step);
+    };
+
+    if (this._exprRaf) {
+      cancelAnimationFrame(this._exprRaf);
+    }
+    this._exprRaf = requestAnimationFrame(step);
+  }
+
+  _randomCodeLine() {
+    const hex = Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    const ip = `${20 + Math.floor(Math.random() * 200)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+    const pool = [
+      `0x${hex} :: suit.bus.sync(${Math.floor(Math.random() * 2048)})`,
+      `if(threat_score > ${(0.5 + Math.random() * 0.4).toFixed(2)}) deploy_countermeasures();`,
+      `vector<float> arc = solve_reactor(${(Math.random() * 9).toFixed(3)}f);`,
+      `telemetry.push({ cpu:${Math.floor(Math.random() * 100)}, gpu:${Math.floor(Math.random() * 100)} });`,
+      `net.route = "${ip}"; auth.token = "${hex.toUpperCase()}";`,
+      `for(auto i=0;i<${4 + Math.floor(Math.random() * 9)};++i){ lattice[i] ^= 0x${hex.slice(0, 4)}; }`,
+      `def recalibrate(field): return (field * ${(1 + Math.random()).toFixed(3)}) % 97`,
+    ];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  _startCodeStream() {
+    if (!this.dom.codeStream) return;
+    const lines = [];
+    const fill = () => {
+      lines.push(this._randomCodeLine());
+      while (lines.length > 9) lines.shift();
+      this.dom.codeStream.textContent = lines.join('\n');
+    };
+
+    fill();
+    if (this._codeStreamTimer) {
+      clearInterval(this._codeStreamTimer);
+    }
+    this._codeStreamTimer = setInterval(fill, 180);
   }
 
   _initHealthMatrix() {
@@ -810,6 +1050,9 @@ class JarvisApp {
     if (!dotEl) return;
     dotEl.classList.remove('ok', 'warn', 'dead');
     dotEl.classList.add(state);
+    dotEl.classList.remove('dot-ping');
+    void dotEl.offsetWidth;
+    dotEl.classList.add('dot-ping');
   }
 
   _applyServiceHealth(payload) {

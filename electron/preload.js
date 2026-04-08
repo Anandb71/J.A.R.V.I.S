@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('jarvis', {
     return () => ipcRenderer.removeListener('jarvis:backend-status', listener);
   },
   onToggleFocusShortcut: (callback) => {
-    const listener = () => callback();
+    const listener = (_event, payload) => callback(payload);
     ipcRenderer.on('jarvis:toggle-focus', listener);
     return () => ipcRenderer.removeListener('jarvis:toggle-focus', listener);
   },

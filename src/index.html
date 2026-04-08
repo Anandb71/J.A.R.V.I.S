@@ -10,6 +10,21 @@
     <link rel="stylesheet" href="./css/hud.css" />
   </head>
   <body>
+    <div id="boot-overlay" class="boot-overlay" role="status" aria-live="polite">
+      <div class="boot-mech-gate gate-left" aria-hidden="true"></div>
+      <div class="boot-mech-gate gate-right" aria-hidden="true"></div>
+      <div class="boot-lockbar lock-top" aria-hidden="true"></div>
+      <div class="boot-lockbar lock-bottom" aria-hidden="true"></div>
+      <div class="boot-reactor"></div>
+      <div class="boot-brace brace-a" aria-hidden="true"></div>
+      <div class="boot-brace brace-b" aria-hidden="true"></div>
+      <div class="boot-text">J.A.R.V.I.S. INITIALIZING</div>
+      <div class="boot-progress-track" aria-hidden="true">
+        <div id="boot-progress-fill" class="boot-progress-fill"></div>
+      </div>
+      <div id="boot-log" class="boot-log">Starting core services…</div>
+    </div>
+
     <!-- ═══ Main HUD ═══ -->
     <div id="hud-root" class="hud-root">
 
@@ -84,6 +99,36 @@
       <main class="hud-panel center-panel">
         <canvas id="three-canvas" class="three-canvas"></canvas>
         <div class="center-grid-overlay"></div>
+        <div class="vector-primitives" aria-hidden="true">
+          <span class="vp-circle vp-c1"></span>
+          <span class="vp-circle vp-c2"></span>
+          <span class="vp-circle vp-c3"></span>
+          <span class="vp-dash vp-d1"></span>
+          <span class="vp-dash vp-d2"></span>
+          <span class="vp-bracket vp-b1"></span>
+          <span class="vp-bracket vp-b2"></span>
+          <span class="vp-hex-grid"></span>
+        </div>
+        <div id="greeble-layer" class="greeble-layer" aria-hidden="true">
+          <div class="greeble greeble-a"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="greeble greeble-b"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="greeble greeble-c"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="wireframe-layer" aria-hidden="true">
+          <svg class="wireframe-svg" viewBox="0 0 320 320" role="presentation">
+            <g>
+              <polygon points="160,26 275,92 275,226 160,294 45,226 45,92" />
+              <polygon points="160,56 249,108 249,212 160,264 71,212 71,108" />
+              <line x1="160" y1="26" x2="160" y2="294" />
+              <line x1="45" y1="92" x2="275" y2="226" />
+              <line x1="275" y1="92" x2="45" y2="226" />
+            </g>
+          </svg>
+        </div>
+        <div id="particle-flow" class="particle-flow" aria-hidden="true"></div>
+        <div class="code-stream-module" aria-hidden="true">
+          <pre id="code-stream" class="code-stream"></pre>
+        </div>
         <div class="radar-sweep" aria-hidden="true"></div>
         <div class="center-hud-rings" aria-hidden="true">
           <span class="ring ring-a"></span>
@@ -98,6 +143,13 @@
         </div>
         <div class="reactor-hash-marks" aria-hidden="true">
           <span>00</span><span>15</span><span>30</span><span>45</span><span>60</span><span>75</span><span>90</span><span>99</span>
+        </div>
+        <div class="lens-stack" aria-hidden="true">
+          <span class="lens-flare"></span>
+          <span class="lens-ca"></span>
+          <span class="lens-grain"></span>
+          <span class="lens-dof near"></span>
+          <span class="lens-dof far"></span>
         </div>
 
         <div class="center-side-modules" aria-hidden="true">

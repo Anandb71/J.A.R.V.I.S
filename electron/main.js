@@ -227,11 +227,11 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1600,
     height: 900,
-    transparent: false,
+    transparent: true,
     frame: false,
     alwaysOnTop: true,
-    hasShadow: true,
-    backgroundColor: '#020812',
+    hasShadow: false,
+    backgroundColor: '#00000000',
     resizable: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -277,7 +277,7 @@ function registerShortcuts() {
     clickThrough = !clickThrough;
     if (!mainWindow) return;
     mainWindow.setIgnoreMouseEvents(clickThrough, { forward: true });
-    mainWindow.webContents.send('jarvis:toggle-focus');
+    mainWindow.webContents.send('jarvis:toggle-focus', { clickThrough });
   });
 }
 
