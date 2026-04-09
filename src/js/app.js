@@ -58,11 +58,26 @@ class JarvisApp {
     this._nullAnchor = { x: 0, y: 0 };
     this._nullAnchorTarget = { x: 0, y: 0 };
     this._codeStreamTimer = null;
+    this._arcPower = 100;
+    this._tacticalContacts = [];
+    this._overlayTickTimer = null;
+    this._alertTickerTimer = null;
+    this._labGesture = null;
+    this._lastOverlayUpdateAt = 0;
+    this._overlayUpdateIntervalMs = 420;
+    this._minimalUi = false;
   }
 
   /** ── Boot Sequence ──────────────────────────────────────────── */
   async boot() {
     this._cacheDOM();
+    document.body.classList.add('organized-ui');
+    document.body.classList.add('minimal-ui');
+    document.body.classList.add('ultra-clean-ui');
+    this._minimalUi = document.body.classList.contains('minimal-ui');
+    if (this._minimalUi) {
+      this._overlayUpdateIntervalMs = 900;
+    }
     document.body.classList.add('startup-sequence');
     this._setAiEra('jarvis');
     if (this.dom.hudRoot) {
@@ -79,9 +94,12 @@ class JarvisApp {
 
     this.gauges.init();
     this._initThreeJs();
-    this._initCinematicHudRig();
-    this._startCodeStream();
-    this._startExpressionRig();
+    if (!this._minimalUi) {
+      this._initCinematicHudRig();
+      this._startCodeStream();
+      this._startExpressionRig();
+    }
+    this._initMissionOverlays();
 
     // Start WebSocket
     this._connectWebSocket();
@@ -93,6 +111,7 @@ class JarvisApp {
     await this._sleep(160);
     this._completeBoot();
     this._bindUI();
+    this._startOverlayAmbientLoops();
     this._startWeatherLoop();
     this.chat.addSystem('J.A.R.V.I.S. is online. At your service.');
   }
@@ -132,6 +151,31 @@ class JarvisApp {
       codeStream: document.getElementById('code-stream'),
       particleFlow: document.getElementById('particle-flow'),
       centerPanel: document.querySelector('.center-panel'),
+      tacticalTargets: document.getElementById('tactical-targets'),
+      threatFeed: document.getElementById('threat-feed'),
+      tacticalMapDots: document.getElementById('tactical-map-dots'),
+      incomingTrajectory: document.getElementById('incoming-trajectory'),
+      outgoingTrajectory: document.getElementById('outgoing-trajectory'),
+      arcPowerRing: document.getElementById('arc-power-ring'),
+      arcPowerValue: document.getElementById('arc-power-value'),
+      integrityWireframe: document.getElementById('integrity-wireframe'),
+      integrityLabel: document.getElementById('integrity-label'),
+      vitalTemp: document.getElementById('vital-temp'),
+      vitalO2: document.getElementById('vital-o2'),
+      vitalAlt: document.getElementById('vital-alt'),
+      vitalMach: document.getElementById('vital-mach'),
+      vitalSpeed: document.getElementById('vital-speed'),
+      envO2: document.getElementById('env-o2'),
+      envRad: document.getElementById('env-rad'),
+      envTox: document.getElementById('env-tox'),
+      imagingMode: document.getElementById('imaging-mode'),
+      objectIdentification: document.getElementById('object-identification'),
+      commsWaveform: document.getElementById('comms-waveform'),
+      satFeedA: document.getElementById('sat-feed-a'),
+      satFeedB: document.getElementById('sat-feed-b'),
+      alertTicker: document.getElementById('alert-ticker'),
+      holoWorkspace: document.getElementById('holo-workspace'),
+      holoTrash: document.getElementById('holo-trash'),
     };
   }
 
@@ -263,6 +307,7 @@ class JarvisApp {
         this.gauges.update(payload);
         this._updateStressLevel(payload);
         this._updateArmorTelemetry(payload);
+        this._updateMissionOverlays(payload);
         this._triggerTelemetryPulse(payload);
         break;
 
@@ -1018,6 +1063,287 @@ class JarvisApp {
       clearInterval(this._codeStreamTimer);
     }
     this._codeStreamTimer = setInterval(fill, 180);
+  }
+
+  _initMissionOverlays() {
+    const contactCount = this._minimalUi ? 1 : 3;
+    this._tacticalContacts = Array.from({ length: contactCount }, (_, idx) => ({
+      id: `T-${idx + 1}`,
+      x: 12 + Math.random() * 76,
+      y: 14 + Math.random() * 68,
+      vx: (Math.random() - 0.5) * 0.65,
+      vy: (Math.random() - 0.5) * 0.65,
+      armor: ['Light', 'Composite', 'Reactive'][Math.floor(Math.random() * 3)],
+      weapon: ['Ballistic', 'Energy', 'Unknown'][Math.floor(Math.random() * 3)],
+      integrity: 62 + Math.random() * 34,
+      threat: 18 + Math.random() * 42,
+      locked: false,
+    }));
+
+    if (!document.body.classList.contains('minimal-ui')) {
+      this._initLabGestureControls();
+    }
+  }
+
+  _startOverlayAmbientLoops() {
+    if (this._overlayTickTimer) clearInterval(this._overlayTickTimer);
+    this._overlayTickTimer = setInterval(() => {
+      this._drawCommsWave(this._audioLevel, this._lastStressBand === 'critical' ? 0.95 : this._lastStressBand === 'high' ? 0.75 : 0.42);
+      if (!this._minimalUi) {
+        this._rotateAlertTicker();
+        this._refreshSatelliteText();
+      }
+    }, this._minimalUi ? 1400 : 900);
+
+    if (this._alertTickerTimer) clearInterval(this._alertTickerTimer);
+    if (!this._minimalUi) {
+      this._alertTickerTimer = setInterval(() => this._rotateAlertTicker(), 3200);
+    }
+  }
+
+  _updateMissionOverlays(metrics) {
+    const now = Date.now();
+    if (now - this._lastOverlayUpdateAt < this._overlayUpdateIntervalMs) {
+      return;
+    }
+    this._lastOverlayUpdateAt = now;
+
+    const cpu = Number(metrics?.cpu_percent || 0);
+    const gpu = Number(metrics?.gpu_percent || 0);
+    const ram = Number(metrics?.ram_percent || 0);
+    const stress = Math.max(cpu, gpu, ram);
+
+    if (document.body.classList.contains('minimal-ui')) {
+      this._drawCommsWave(this._audioLevel, stress / 100);
+      return;
+    }
+
+    const consumption = 0.14 + (stress / 100) * 0.42;
+    const recovery = stress < 44 ? 0.23 : 0.04;
+    this._arcPower = Math.max(12, Math.min(100, this._arcPower - consumption + recovery));
+
+    if (this.dom.arcPowerRing) this.dom.arcPowerRing.style.setProperty('--p', `${this._arcPower.toFixed(1)}%`);
+    if (this.dom.arcPowerValue) this.dom.arcPowerValue.textContent = `${Math.round(this._arcPower)}%`;
+
+    const temp = Math.round(34 + stress * 0.58);
+    const o2 = Math.max(72, Math.round(99 - stress * 0.15));
+    const mach = Math.max(0.42, (0.45 + (stress / 100) * 1.62).toFixed(2));
+    const speed = Math.round(Number(mach) * 1225);
+    const alt = Math.round(320 + stress * 88 + (Math.sin(Date.now() / 1400) * 120));
+
+    if (this.dom.vitalTemp) this.dom.vitalTemp.textContent = `${temp}°C`;
+    if (this.dom.vitalO2) this.dom.vitalO2.textContent = `${o2}%`;
+    if (this.dom.vitalMach) this.dom.vitalMach.textContent = `${mach}`;
+    if (this.dom.vitalSpeed) this.dom.vitalSpeed.textContent = `${speed} km/h`;
+    if (this.dom.vitalAlt) this.dom.vitalAlt.textContent = `${alt} m`;
+
+    if (this.dom.envO2) this.dom.envO2.textContent = `${(20.1 + (o2 - 90) * 0.03).toFixed(1)}%`;
+    if (this.dom.envRad) this.dom.envRad.textContent = `${(0.12 + stress * 0.008).toFixed(2)} μSv/h`;
+    if (this.dom.envTox) this.dom.envTox.textContent = `${Math.max(4, Math.round(6 + stress * 0.48))} ppm`;
+
+    const imaging = stress > 82 ? 'THERMAL TRACK' : this._aiEra === 'edith' ? 'X-RAY SCAN' : 'SPECTRAL NORMAL';
+    if (this.dom.imagingMode) this.dom.imagingMode.textContent = imaging;
+
+    this._updateStructuralIntegrity(stress);
+    this._updateTacticalContacts(stress);
+    this._renderTacticalTargets();
+    this._renderThreatFeed();
+    this._renderTacticalMap();
+    this._renderTrajectoryPaths();
+    this._updateObjectIdentification();
+  }
+
+  _updateStructuralIntegrity(stress) {
+    const zones = this.dom.integrityWireframe?.querySelectorAll('i') || [];
+    const compromisedCount = stress >= 88 ? 3 : stress >= 72 ? 2 : stress >= 58 ? 1 : 0;
+    zones.forEach((z, idx) => {
+      z.classList.toggle('compromised', idx < compromisedCount);
+      z.classList.toggle('critical', idx === 0 && stress >= 90);
+    });
+    if (this.dom.integrityLabel) {
+      this.dom.integrityLabel.textContent = compromisedCount === 0
+        ? 'ALL SYSTEMS NOMINAL'
+        : compromisedCount === 1
+          ? 'MINOR ARMOR COMPROMISE'
+          : compromisedCount === 2
+            ? 'MULTI-ZONE DAMAGE'
+            : 'CRITICAL STRUCTURAL BREACH';
+    }
+  }
+
+  _updateTacticalContacts(stress) {
+    this._tacticalContacts.forEach((c) => {
+      c.x += c.vx;
+      c.y += c.vy;
+      if (c.x < 6 || c.x > 94) c.vx *= -1;
+      if (c.y < 8 || c.y > 92) c.vy *= -1;
+      c.x = Math.max(6, Math.min(94, c.x));
+      c.y = Math.max(8, Math.min(92, c.y));
+
+      const volatility = (Math.random() - 0.5) * 8;
+      c.threat = Math.max(5, Math.min(99, c.threat * 0.82 + (stress * 0.18) + volatility));
+      c.integrity = Math.max(8, Math.min(100, c.integrity - (c.threat > 78 ? 0.65 : 0.12)));
+      c.locked = c.threat > 68;
+    });
+
+    this._tacticalContacts.sort((a, b) => b.threat - a.threat);
+  }
+
+  _renderTacticalTargets() {
+    if (!this.dom.tacticalTargets) return;
+    const maxTargets = document.body.classList.contains('minimal-ui') ? 1 : 4;
+    const html = this._tacticalContacts.slice(0, maxTargets).map((c) => {
+      const threatClass = c.threat >= 82 ? 'threat-high' : c.threat >= 58 ? 'threat-mid' : 'threat-low';
+      const lockClass = c.locked ? 'locked' : 'searching';
+      return `<div class="target-reticle ${threatClass} ${lockClass}" style="left:${c.x}%;top:${c.y}%"><span>${c.id}</span></div>`;
+    }).join('');
+    this.dom.tacticalTargets.innerHTML = html;
+  }
+
+  _renderThreatFeed() {
+    if (!this.dom.threatFeed) return;
+    const html = this._tacticalContacts.slice(0, 3).map((c) => (
+      `<div><b>${c.id}</b> ${c.weapon} / ${c.armor} · Integrity ${Math.round(c.integrity)}% · Threat ${Math.round(c.threat)}%</div>`
+    )).join('');
+    this.dom.threatFeed.innerHTML = html;
+  }
+
+  _renderTacticalMap() {
+    if (!this.dom.tacticalMapDots) return;
+    const html = this._tacticalContacts.slice(0, 6).map((c) => {
+      const x = Math.max(8, Math.min(92, c.x));
+      const y = Math.max(8, Math.min(92, c.y));
+      const hot = c.threat >= 78 ? 'hot' : '';
+      return `<i class="map-dot ${hot}" style="left:${x}%;top:${y}%"></i>`;
+    }).join('');
+    this.dom.tacticalMapDots.innerHTML = html;
+  }
+
+  _renderTrajectoryPaths() {
+    const primary = this._tacticalContacts[0];
+    if (!primary) return;
+
+    if (this.dom.incomingTrajectory) {
+      const dIn = `M 4 ${Math.max(8, primary.y - 18).toFixed(1)} Q ${(primary.x * 0.45).toFixed(1)} ${(primary.y * 0.8).toFixed(1)} ${primary.x.toFixed(1)} ${primary.y.toFixed(1)}`;
+      this.dom.incomingTrajectory.setAttribute('d', dIn);
+    }
+    if (this.dom.outgoingTrajectory) {
+      const dOut = `M 18 84 Q ${(primary.x * 0.65).toFixed(1)} ${(primary.y * 1.1).toFixed(1)} ${Math.max(12, primary.x - 2).toFixed(1)} ${Math.max(8, primary.y - 2).toFixed(1)}`;
+      this.dom.outgoingTrajectory.setAttribute('d', dOut);
+    }
+  }
+
+  _updateObjectIdentification() {
+    if (!this.dom.objectIdentification) return;
+    const primary = this._tacticalContacts[0];
+    if (!primary) return;
+    const dbTag = `${Math.floor(1000 + Math.random() * 9000)}-${String.fromCharCode(65 + Math.floor(Math.random() * 26))}`;
+    const conf = Math.round(72 + Math.min(24, primary.threat * 0.22));
+    this.dom.objectIdentification.textContent = `${primary.id} // ${primary.weapon} PLATFORM // MATCH ${conf}% // DB:${dbTag}`;
+  }
+
+  _drawCommsWave(audioLevel, stressNorm) {
+    const canvas = this.dom.commsWaveform;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const t = performance.now() / 380;
+    const amp = 4 + (audioLevel * 18) + (stressNorm * 6);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(118, 212, 255, 0.9)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (let x = 0; x < w; x += 2) {
+      const y = h * 0.5 + Math.sin((x / 18) + t) * amp + Math.sin((x / 7) + (t * 0.6)) * (amp * 0.3);
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  _refreshSatelliteText() {
+    const base = this._tacticalContacts[0];
+    if (!base) return;
+    const lat = (12.9 + ((base.y - 50) / 200)).toFixed(3);
+    const lon = (77.6 + ((base.x - 50) / 200)).toFixed(3);
+    const stamp = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (this.dom.satFeedA) this.dom.satFeedA.textContent = `LAT ${lat} / LON ${lon} @ ${stamp}`;
+    if (this.dom.satFeedB) this.dom.satFeedB.textContent = `VECTOR ${Math.round(base.threat)}° / LOCK ${base.locked ? 'YES' : 'NO'}`;
+  }
+
+  _rotateAlertTicker() {
+    if (!this.dom.alertTicker) return;
+    const primary = this._tacticalContacts[0];
+    const threat = primary ? Math.round(primary.threat) : 0;
+    const alerts = [
+      `PRIORITY // Threat envelope ${threat}% // Countermeasures standby`,
+      `OPS // Structural integrity ${Math.round(this._arcPower)}% power reserve`,
+      `COMMS // Multi-channel tactical uplink synchronized`,
+      `ENV // Atmospheric diagnostics streaming live`,
+      `LAB // Gesture delete active: throw module into TRASH zone`,
+    ];
+    this.dom.alertTicker.textContent = alerts[Math.floor(Math.random() * alerts.length)];
+  }
+
+  _initLabGestureControls() {
+    const workspace = this.dom.holoWorkspace;
+    const trash = this.dom.holoTrash;
+    if (!workspace || !trash) return;
+
+    workspace.addEventListener('pointerdown', (event) => {
+      const node = event.target instanceof Element ? event.target.closest('.holo-node') : null;
+      if (!node) return;
+
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const startedAt = performance.now();
+      this._labGesture = { node, startX, startY, startedAt, lastX: startX, lastY: startY };
+      node.classList.add('dragging');
+
+      const onMove = (e) => {
+        if (!this._labGesture) return;
+        const dx = e.clientX - this._labGesture.startX;
+        const dy = e.clientY - this._labGesture.startY;
+        this._labGesture.lastX = e.clientX;
+        this._labGesture.lastY = e.clientY;
+        this._labGesture.node.style.transform = `translate(${dx}px, ${dy}px)`;
+      };
+
+      const onUp = (e) => {
+        if (!this._labGesture) return;
+        const g = this._labGesture;
+        const dt = Math.max(16, performance.now() - g.startedAt);
+        const vx = (e.clientX - g.startX) / dt;
+        const vy = (e.clientY - g.startY) / dt;
+        const thrown = Math.abs(vx) + Math.abs(vy) > 1.35;
+        const trashRect = trash.getBoundingClientRect();
+        const inTrash = e.clientX >= trashRect.left && e.clientX <= trashRect.right && e.clientY >= trashRect.top && e.clientY <= trashRect.bottom;
+
+        g.node.classList.remove('dragging');
+        g.node.style.transform = '';
+
+        if (inTrash || thrown) {
+          g.node.classList.add('deleted');
+          setTimeout(() => {
+            g.node.remove();
+            if (!workspace.querySelector('.holo-node')) {
+              workspace.innerHTML = '<article class="holo-node" data-node="rebuild" draggable="false"><b>NEW MODULE</b><span>Auto-generated</span></article>';
+            }
+          }, 180);
+        }
+
+        this._labGesture = null;
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      };
+
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    });
   }
 
   _initHealthMatrix() {

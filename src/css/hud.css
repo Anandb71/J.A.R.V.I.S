@@ -1368,6 +1368,537 @@ body.startup-sequence[data-startup-phase="phase-6"] .bottom-bar {
   opacity: .68;
 }
 
+.combat-overlay,
+.suit-status-overlay,
+.environment-overlay,
+.lab-overlay {
+  position: absolute;
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.combat-overlay {
+  inset: 0;
+  pointer-events: none;
+}
+
+.tactical-targets {
+  position: absolute;
+  inset: 0;
+}
+
+.target-reticle {
+  position: absolute;
+  width: 68px;
+  height: 68px;
+  margin-left: -34px;
+  margin-top: -34px;
+  border: 1px solid rgba(110, 208, 255, 0.45);
+  border-radius: 0;
+}
+
+.target-reticle::before,
+.target-reticle::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 1px dashed rgba(146, 218, 255, 0.28);
+}
+
+.target-reticle span {
+  position: absolute;
+  top: -18px;
+  left: -1px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  font-family: 'Cascadia Mono', 'Consolas', monospace;
+  color: #9fd8ff;
+}
+
+.target-reticle.threat-mid { border-color: rgba(255, 194, 88, 0.6); }
+.target-reticle.threat-high { border-color: rgba(255, 98, 122, 0.78); }
+.target-reticle.locked { box-shadow: 0 0 12px rgba(255, 86, 112, 0.36); }
+
+.ballistics-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ballistics-layer path {
+  fill: none;
+  stroke-width: .45;
+  stroke-linecap: round;
+}
+
+#incoming-trajectory {
+  stroke: rgba(255, 138, 156, 0.8);
+  stroke-dasharray: 2.2 1.6;
+}
+
+#outgoing-trajectory {
+  stroke: rgba(123, 224, 255, 0.85);
+  stroke-dasharray: 1.8 1.4;
+}
+
+.threat-assessment,
+.tactical-map,
+.suit-status-overlay,
+.environment-overlay,
+.lab-overlay {
+  border: 1px solid rgba(108, 191, 242, 0.34);
+  background: rgba(7, 25, 42, 0.56);
+  backdrop-filter: none;
+}
+
+.threat-assessment {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  width: min(330px, 34%);
+  padding: 8px;
+}
+
+.threat-assessment h4,
+.tactical-map h4,
+.environment-overlay h4,
+.lab-overlay h4 {
+  margin: 0 0 6px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #8dd5ff;
+}
+
+.threat-feed {
+  display: grid;
+  gap: 4px;
+  font-size: 9px;
+  color: #b8e4ff;
+  font-family: 'Cascadia Mono', 'Consolas', monospace;
+}
+
+.threat-feed b {
+  color: #7cd0ff;
+  margin-right: 4px;
+}
+
+.tactical-map {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 150px;
+  padding: 8px;
+}
+
+.map-disc {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  border: 1px solid rgba(114, 194, 241, 0.3);
+  background: radial-gradient(circle, rgba(18, 68, 106, 0.22), rgba(5, 20, 34, 0.42));
+}
+
+.map-dots { position: absolute; inset: 0; }
+
+.map-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: #8de0ff;
+  box-shadow: 0 0 8px rgba(91, 209, 255, 0.55);
+}
+
+.map-dot.hot {
+  background: #ff8aa2;
+  box-shadow: 0 0 8px rgba(255, 110, 142, 0.55);
+}
+
+.suit-status-overlay {
+  left: 12px;
+  bottom: 12px;
+  width: min(340px, 36%);
+  padding: 8px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+}
+
+.arc-power {
+  display: grid;
+  gap: 5px;
+}
+
+.arc-power > span,
+.structural-integrity > span {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: #8cd3ff;
+}
+
+.arc-power-ring {
+  --p: 100%;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(rgba(97, 206, 255, 0.86) var(--p), rgba(20, 48, 70, 0.35) var(--p));
+}
+
+.arc-power-ring b {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-family: 'Orbitron', sans-serif;
+  color: #c2ebff;
+  background: rgba(2, 14, 24, 0.9);
+}
+
+.structural-integrity {
+  display: grid;
+  gap: 5px;
+}
+
+.integrity-wireframe {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.integrity-wireframe i {
+  display: block;
+  height: 14px;
+  background: rgba(118, 213, 255, 0.2);
+  border: 1px solid rgba(113, 198, 245, 0.3);
+}
+
+.integrity-wireframe i.compromised {
+  background: rgba(255, 180, 96, 0.28);
+  border-color: rgba(255, 180, 96, 0.5);
+}
+
+.integrity-wireframe i.critical {
+  background: rgba(255, 96, 126, 0.35);
+  border-color: rgba(255, 96, 126, 0.66);
+}
+
+.structural-integrity small {
+  font-size: 9px;
+  color: #a7dbf9;
+  letter-spacing: 0.06em;
+}
+
+.vitals-readout {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px 8px;
+  font-size: 9px;
+  color: #89c7ed;
+  font-family: 'Cascadia Mono', 'Consolas', monospace;
+}
+
+.vitals-readout b { color: #d0edff; }
+
+.environment-overlay {
+  right: 12px;
+  bottom: 12px;
+  width: 220px;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.env-grid {
+  display: grid;
+  gap: 4px;
+  font-size: 9px;
+  color: #a8d8f3;
+  font-family: 'Cascadia Mono', 'Consolas', monospace;
+}
+
+.env-grid b,
+.imaging-row b { color: #d8efff; }
+
+.imaging-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: #92cff3;
+}
+
+.object-identification {
+  font-size: 9px;
+  line-height: 1.35;
+  color: #bde6ff;
+  font-family: 'Cascadia Mono', 'Consolas', monospace;
+}
+
+.lab-overlay {
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  width: min(520px, 52%);
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.holo-workspace {
+  display: flex;
+  gap: 6px;
+  min-height: 52px;
+}
+
+.holo-node {
+  flex: 1;
+  border: 1px solid rgba(112, 194, 241, 0.35);
+  background: rgba(8, 28, 46, 0.58);
+  padding: 6px;
+  cursor: grab;
+  user-select: none;
+  display: grid;
+  gap: 2px;
+}
+
+.holo-node b {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: #9ddcff;
+}
+
+.holo-node span {
+  font-size: 9px;
+  color: #7eb5d8;
+}
+
+.holo-node.dragging { opacity: .8; cursor: grabbing; }
+.holo-node.deleted { opacity: 0; transform: scale(.86); transition: 160ms ease; }
+
+.holo-trash {
+  border: 1px dashed rgba(255, 120, 150, 0.46);
+  color: #ff97b2;
+  font-size: 9px;
+  padding: 5px 6px;
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+
+.comms-wave-wrap {
+  border: 1px solid rgba(106, 188, 239, 0.26);
+  background: rgba(7, 25, 42, 0.52);
+  padding: 6px;
+  margin-bottom: 8px;
+}
+
+.comms-wave-wrap canvas {
+  width: 100%;
+  height: 58px;
+  display: block;
+}
+
+.satellite-feeds {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.sat-feed {
+  border: 1px solid rgba(103, 186, 238, 0.28);
+  background: rgba(7, 22, 36, 0.5);
+  padding: 5px 6px;
+  display: grid;
+  gap: 2px;
+}
+
+.sat-feed span {
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: #89caee;
+}
+
+.sat-feed b {
+  font-size: 9px;
+  color: #bfe7ff;
+  font-family: 'Cascadia Mono', 'Consolas', monospace;
+}
+
+.priority-feed {
+  border: 1px solid rgba(114, 193, 241, 0.26);
+  background: rgba(8, 24, 40, 0.52);
+  padding: 6px;
+  margin-bottom: 8px;
+}
+
+.alert-ticker {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: #d0ecff;
+  font-family: 'Cascadia Mono', 'Consolas', monospace;
+}
+
+/* ── Organized UI Mode (performance + clarity) ───────────────── */
+body.organized-ui .greeble-layer,
+body.organized-ui .particle-flow,
+body.organized-ui .lens-stack,
+body.organized-ui .code-stream-module {
+  display: none !important;
+}
+
+body.organized-ui .wireframe-layer {
+  opacity: .2;
+}
+
+body.organized-ui .combat-overlay,
+body.organized-ui .suit-status-overlay,
+body.organized-ui .environment-overlay,
+body.organized-ui .lab-overlay {
+  z-index: 7;
+}
+
+body.organized-ui .threat-assessment {
+  width: min(300px, 32%);
+  max-height: 130px;
+  overflow: hidden;
+}
+
+body.organized-ui .tactical-map {
+  width: 136px;
+}
+
+body.organized-ui .map-disc {
+  width: 118px;
+  height: 118px;
+}
+
+body.organized-ui .suit-status-overlay {
+  width: min(320px, 34%);
+  bottom: 10px;
+}
+
+body.organized-ui .environment-overlay {
+  width: 208px;
+  bottom: 10px;
+}
+
+body.organized-ui .lab-overlay {
+  width: min(460px, 48%);
+  bottom: 10px;
+}
+
+body.organized-ui .holo-workspace {
+  min-height: 44px;
+}
+
+body.organized-ui .holo-node {
+  padding: 5px;
+}
+
+/* ── Minimal UI Mode (default clean layout) ──────────────────── */
+body.minimal-ui .combat-overlay,
+body.minimal-ui .suit-status-overlay,
+body.minimal-ui .environment-overlay,
+body.minimal-ui .lab-overlay,
+body.minimal-ui .center-side-modules,
+body.minimal-ui .ballistics-layer,
+body.minimal-ui .tactical-targets {
+  display: none !important;
+}
+
+body.minimal-ui .vector-primitives,
+body.minimal-ui .wireframe-layer,
+body.minimal-ui .reactor-data-arcs,
+body.minimal-ui .reactor-hash-marks,
+body.minimal-ui .radar-sweep,
+body.minimal-ui .center-grid-overlay {
+  display: none !important;
+}
+
+body.minimal-ui .center-hud-rings .ring-b,
+body.minimal-ui .center-hud-rings .ring-c,
+body.minimal-ui .orb-ring::before,
+body.minimal-ui .orb-ring::after {
+  display: none !important;
+}
+
+body.minimal-ui .top-ticks {
+  display: none;
+}
+
+body.minimal-ui .center-panel {
+  border: 1px solid rgba(94, 176, 229, 0.28) !important;
+}
+
+body.minimal-ui .orb-wrap {
+  gap: 8px;
+}
+
+body.minimal-ui .orb-substats {
+  opacity: .9;
+}
+
+body.minimal-ui .orb-substats span {
+  padding: 2px 6px;
+  font-size: 8px;
+}
+
+body.ultra-clean-ui .hud-root {
+  padding: 10px;
+  gap: 10px;
+}
+
+body.ultra-clean-ui .left-panel {
+  padding: 10px;
+}
+
+body.ultra-clean-ui .right-panel {
+  padding: 10px;
+}
+
+body.ultra-clean-ui .panel-subtitle,
+body.ultra-clean-ui .diag-bars,
+body.ultra-clean-ui .panel-footer-note,
+body.ultra-clean-ui .comms-strip,
+body.ultra-clean-ui .mission-list,
+body.ultra-clean-ui .comms-wave-wrap,
+body.ultra-clean-ui .satellite-feeds,
+body.ultra-clean-ui .priority-feed,
+body.ultra-clean-ui #armor-signature-module,
+body.ultra-clean-ui .top-ticks {
+  display: none !important;
+}
+
+body.ultra-clean-ui .gauges-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+body.ultra-clean-ui .gauge-card {
+  padding: 4px;
+}
+
+body.ultra-clean-ui .sys-details {
+  margin-top: 8px;
+  gap: 4px;
+}
+
+body.ultra-clean-ui .chat-panel {
+  min-height: 180px;
+}
+
+body.ultra-clean-ui .bottom-bar {
+  padding: 6px 10px;
+}
+
 .center-panel::before {
   display: none;
 }
