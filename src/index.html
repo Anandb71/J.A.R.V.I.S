@@ -152,6 +152,69 @@
           <span class="lens-dof far"></span>
         </div>
 
+        <section class="combat-overlay" aria-label="Combat and tactical overlay">
+          <div id="tactical-targets" class="tactical-targets" aria-hidden="true"></div>
+          <svg id="ballistics-layer" class="ballistics-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <path id="incoming-trajectory" d="M 5 10 Q 40 45 80 20"></path>
+            <path id="outgoing-trajectory" d="M 20 80 Q 55 45 92 28"></path>
+          </svg>
+          <div class="threat-assessment">
+            <h4>THREAT ASSESSMENT</h4>
+            <div id="threat-feed" class="threat-feed"></div>
+          </div>
+          <div class="tactical-map">
+            <h4>TACTICAL MAP 360°</h4>
+            <div class="map-disc">
+              <div id="tactical-map-dots" class="map-dots"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="suit-status-overlay" aria-label="Suit status and vitals">
+          <div class="arc-power">
+            <span>ARC POWER</span>
+            <div id="arc-power-ring" class="arc-power-ring"><b id="arc-power-value">--%</b></div>
+          </div>
+          <div class="structural-integrity">
+            <span>STRUCTURAL INTEGRITY</span>
+            <div id="integrity-wireframe" class="integrity-wireframe" aria-hidden="true">
+              <i data-zone="helmet"></i><i data-zone="torso"></i><i data-zone="leftArm"></i><i data-zone="rightArm"></i><i data-zone="leftLeg"></i><i data-zone="rightLeg"></i>
+            </div>
+            <small id="integrity-label">ALL SYSTEMS NOMINAL</small>
+          </div>
+          <div class="vitals-readout">
+            <div>TEMP <b id="vital-temp">--°C</b></div>
+            <div>O2 <b id="vital-o2">--%</b></div>
+            <div>ALT <b id="vital-alt">-- m</b></div>
+            <div>MACH <b id="vital-mach">--</b></div>
+            <div>SPEED <b id="vital-speed">-- km/h</b></div>
+          </div>
+        </section>
+
+        <section class="environment-overlay" aria-label="Environmental analysis">
+          <h4>ENVIRONMENTAL ANALYSIS</h4>
+          <div class="env-grid">
+            <div>OXYGEN <b id="env-o2">--%</b></div>
+            <div>RADIATION <b id="env-rad">-- μSv/h</b></div>
+            <div>TOXICITY <b id="env-tox">-- ppm</b></div>
+          </div>
+          <div class="imaging-row">
+            <span>IMAGING</span>
+            <b id="imaging-mode">NORMAL</b>
+          </div>
+          <div id="object-identification" class="object-identification">SCANNING OBJECTS…</div>
+        </section>
+
+        <section class="lab-overlay" aria-label="Holographic table">
+          <h4>HOLOGRAPHIC TABLE // LAB</h4>
+          <div id="holo-workspace" class="holo-workspace">
+            <article class="holo-node" data-node="reactor-core" draggable="false"><b>ARC REACTOR CORE</b><span>Stress Sim</span></article>
+            <article class="holo-node" data-node="left-gauntlet" draggable="false"><b>LEFT GAUNTLET</b><span>Exploded View</span></article>
+            <article class="holo-node" data-node="thruster-array" draggable="false"><b>THRUSTER ARRAY</b><span>Vector Sim</span></article>
+          </div>
+          <div id="holo-trash" class="holo-trash" aria-label="Trash zone">TRASH / DELETE GESTURE</div>
+        </section>
+
         <div class="center-side-modules" aria-hidden="true">
           <div class="side-module left">
             <h4>SYSTEM DIAGNOSTICS</h4>
@@ -198,6 +261,16 @@
           <div><b>QUEUE</b> Target analysis pipeline</div>
           <div><b>QUEUE</b> System integrity sweep</div>
           <div><b>LIVE</b> Assist channel active</div>
+        </div>
+        <div class="comms-wave-wrap">
+          <canvas id="comms-waveform" width="300" height="64" aria-label="Comms waveform"></canvas>
+        </div>
+        <div class="satellite-feeds" aria-label="Satellite feeds">
+          <div class="sat-feed"><span>SAT-01</span><b id="sat-feed-a">GRID LOCK...</b></div>
+          <div class="sat-feed"><span>DRONE-07</span><b id="sat-feed-b">STREAM LINK...</b></div>
+        </div>
+        <div class="priority-feed" aria-live="polite">
+          <div id="alert-ticker" class="alert-ticker">PRIORITY // Booting tactical alerts…</div>
         </div>
         <div id="armor-signature-module" class="mask-module" data-theme="nominal" aria-label="Mask visual module">
           <div class="mask-module-title">Armor Signature</div>
