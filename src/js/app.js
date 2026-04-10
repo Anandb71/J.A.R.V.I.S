@@ -92,15 +92,15 @@ class JarvisApp {
     // Start WebSocket
     this._connectWebSocket();
     await this._bootLogTyped('Linking tactical command bus…');
-    await this._sleep(200);
+    await this._sleep(120);
 
     // Complete boot — this is where 'booted' class is added
     await this._bootLogTyped('J.A.R.V.I.S. v25.0 — ALL SYSTEMS ONLINE');
-    await this._sleep(300);
+    await this._sleep(140);
     this._completeBoot();
     this._bindUI();
     this._startWeatherLoop();
-    this.chat.addSystem('J.A.R.V.I.S. v25.0 is online. All systems nominal. At your service, sir.');
+    this.chat.addSystem('J.A.R.V.I.S. online.');
   }
 
   /** Cache DOM references */
@@ -179,24 +179,24 @@ class JarvisApp {
     this.dom.bootLog.textContent = '';
     for (let i = 0; i < msg.length; i++) {
       this.dom.bootLog.textContent += msg[i];
-      await this._sleep(12 + Math.random() * 18);
+      await this._sleep(6 + Math.random() * 6);
     }
-    await this._sleep(80);
+    await this._sleep(30);
   }
 
   /** ── Boot Sequence — Cinematic v25.0 ──────────────────── */
   async _runStartupSequence() {
     const steps = [
-      ['Engaging blast-door lockdown protocol…',     0.05, 'phase-1',  500, 'jarvis'],
-      ['Pressurizing cockpit containment frame…',    0.12, 'phase-2',  450, 'jarvis'],
-      ['Docking upper and lower armor rails…',       0.22, 'phase-3',  500, 'jarvis'],
-      ['Latching lateral armor modules…',            0.32, 'phase-4',  500, 'jarvis'],
-      ['Spinning arc-reactor core lattice…',         0.44, 'phase-5',  600, 'jarvis'],
-      ['Calibrating neural-link telemetry…',         0.56, 'phase-6',  550, 'friday'],
-      ['Synchronizing quantum bus interface…',       0.68, 'phase-7',  500, 'friday'],
-      ['Activating HUD overlay subsystems…',         0.80, 'phase-8',  450, 'friday'],
-      ['Tactical acquisition sweep online…',         0.92, 'phase-9',  400, 'edith'],
-      ['All systems verified. Welcome back, sir.',   1.00, 'phase-10', 600, 'jarvis'],
+      ['Engaging blast-door lockdown protocol…',     0.08, 'phase-1',  220, 'jarvis'],
+      ['Pressurizing cockpit containment frame…',    0.18, 'phase-2',  200, 'jarvis'],
+      ['Docking upper and lower armor rails…',       0.30, 'phase-3',  220, 'jarvis'],
+      ['Latching lateral armor modules…',            0.42, 'phase-4',  220, 'jarvis'],
+      ['Spinning arc-reactor core lattice…',         0.56, 'phase-5',  260, 'jarvis'],
+      ['Calibrating neural-link telemetry…',         0.68, 'phase-6',  240, 'friday'],
+      ['Synchronizing quantum bus interface…',       0.78, 'phase-7',  220, 'friday'],
+      ['Activating HUD overlay subsystems…',         0.88, 'phase-8',  200, 'friday'],
+      ['Tactical acquisition sweep online…',         0.96, 'phase-9',  170, 'edith'],
+      ['All systems verified. Welcome back, sir.',   1.00, 'phase-10', 220, 'jarvis'],
     ];
 
     for (const [label, progress, phase, dwellMs, era] of steps) {
@@ -261,10 +261,10 @@ class JarvisApp {
     // Staggered mechanical panel reveal — uses Web Animations API (fires ONCE, never repeats)
     const panels = [
       { el: document.querySelector('.top-bar'), delay: 0, from: { transform: 'translateY(-28px) scaleY(0.85)', opacity: 0, filter: 'brightness(2.5) blur(3px)' } },
-      { el: document.querySelector('.left-panel'), delay: 140, from: { transform: 'translateX(-36px) scaleX(0.88)', opacity: 0, filter: 'brightness(2) blur(3px)' } },
-      { el: document.querySelector('.center-panel'), delay: 320, from: { transform: 'scale(0.7) rotate(-2deg)', opacity: 0, filter: 'brightness(3) blur(5px) saturate(0.4)' } },
-      { el: document.querySelector('.right-panel'), delay: 500, from: { transform: 'translateX(36px) scaleX(0.88)', opacity: 0, filter: 'brightness(2) blur(3px)' } },
-      { el: document.querySelector('.bottom-bar'), delay: 640, from: { transform: 'translateY(28px) scaleY(0.85)', opacity: 0, filter: 'brightness(2.5) blur(3px)' } },
+      { el: document.querySelector('.left-panel'), delay: 90, from: { transform: 'translateX(-36px) scaleX(0.88)', opacity: 0, filter: 'brightness(2) blur(3px)' } },
+      { el: document.querySelector('.center-panel'), delay: 180, from: { transform: 'scale(0.7) rotate(-2deg)', opacity: 0, filter: 'brightness(3) blur(5px) saturate(0.4)' } },
+      { el: document.querySelector('.right-panel'), delay: 270, from: { transform: 'translateX(36px) scaleX(0.88)', opacity: 0, filter: 'brightness(2) blur(3px)' } },
+      { el: document.querySelector('.bottom-bar'), delay: 360, from: { transform: 'translateY(28px) scaleY(0.85)', opacity: 0, filter: 'brightness(2.5) blur(3px)' } },
     ];
 
     const to = { transform: 'none', opacity: 1, filter: 'brightness(1) blur(0) saturate(1)' };
@@ -275,14 +275,14 @@ class JarvisApp {
 
       // One-shot Web Animation — plays once, commits final state, done.
       el.animate([from, to], {
-        duration: 550,
+        duration: 360,
         easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
         fill: 'forwards',
       });
     }
 
     // After all panels are revealed, ensure clean state
-    await this._sleep(600);
+    await this._sleep(380);
     for (const { el } of panels) {
       if (!el) continue;
       el.style.opacity = '1';
