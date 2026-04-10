@@ -68,22 +68,13 @@ class JarvisApp {
     this._minimalUi = false;
   }
 
-  /** ── Boot Sequence ──────────────────────────────────────────── */
+  /** ── Boot Sequence — Cinematic v5.0 ──────────────────────────── */
   async boot() {
     this._cacheDOM();
-    document.body.classList.add('organized-ui');
-    document.body.classList.add('minimal-ui');
-    document.body.classList.add('ultra-clean-ui');
-    this._minimalUi = document.body.classList.contains('minimal-ui');
-    if (this._minimalUi) {
-      this._overlayUpdateIntervalMs = 900;
-    }
     document.body.classList.add('startup-sequence');
     this._setAiEra('jarvis');
-    if (this.dom.hudRoot) {
-      this.dom.hudRoot.classList.add('booted');
-    }
-    this._bootLog('Calibrating arc-core…');
+    // NOTE: do NOT add 'booted' class here — that triggers panel animations prematurely
+    await this._bootLogTyped('Initializing arc-reactor core subsystem…');
     await this._runStartupSequence();
     this._initHealthMatrix();
     this._startClock();
@@ -94,26 +85,22 @@ class JarvisApp {
 
     this.gauges.init();
     this._initThreeJs();
-    if (!this._minimalUi) {
-      this._initCinematicHudRig();
-      this._startCodeStream();
-      this._startExpressionRig();
-    }
-    this._initMissionOverlays();
+    this._initCinematicHudRig();
+    this._startCodeStream();
+    this._startExpressionRig();
 
     // Start WebSocket
     this._connectWebSocket();
-    this._bootLog('Linking tactical bus…');
-    await this._sleep(120);
+    await this._bootLogTyped('Linking tactical command bus…');
+    await this._sleep(200);
 
-    // Complete boot
-    this._bootLog('J.A.R.V.I.S. online');
-    await this._sleep(160);
+    // Complete boot — this is where 'booted' class is added
+    await this._bootLogTyped('J.A.R.V.I.S. v25.0 — ALL SYSTEMS ONLINE');
+    await this._sleep(300);
     this._completeBoot();
     this._bindUI();
-    this._startOverlayAmbientLoops();
     this._startWeatherLoop();
-    this.chat.addSystem('J.A.R.V.I.S. is online. At your service.');
+    this.chat.addSystem('J.A.R.V.I.S. v25.0 is online. All systems nominal. At your service, sir.');
   }
 
   /** Cache DOM references */
@@ -186,27 +173,55 @@ class JarvisApp {
     }
   }
 
+  /** Typewriter-style boot log — cinematic feel */
+  async _bootLogTyped(msg) {
+    if (!this.dom.bootLog) return;
+    this.dom.bootLog.textContent = '';
+    for (let i = 0; i < msg.length; i++) {
+      this.dom.bootLog.textContent += msg[i];
+      await this._sleep(12 + Math.random() * 18);
+    }
+    await this._sleep(80);
+  }
+
+  /** ── Boot Sequence — Cinematic v25.0 ──────────────────── */
   async _runStartupSequence() {
     const steps = [
-      ['Locking cockpit frame…', 0.12, 'phase-1', 560, 'jarvis'],
-      ['Docking top and bottom rails…', 0.28, 'phase-2', 620, 'jarvis'],
-      ['Latching side armor modules…', 0.46, 'phase-3', 700, 'jarvis'],
-      ['Spinning reactor core lattice…', 0.66, 'phase-4', 760, 'friday'],
-      ['Synchronizing fluid telemetry bus…', 0.84, 'phase-5', 760, 'friday'],
-      ['Tactical overlay acquisition online.', 1, 'phase-6', 700, 'edith'],
+      ['Engaging blast-door lockdown protocol…',     0.05, 'phase-1',  500, 'jarvis'],
+      ['Pressurizing cockpit containment frame…',    0.12, 'phase-2',  450, 'jarvis'],
+      ['Docking upper and lower armor rails…',       0.22, 'phase-3',  500, 'jarvis'],
+      ['Latching lateral armor modules…',            0.32, 'phase-4',  500, 'jarvis'],
+      ['Spinning arc-reactor core lattice…',         0.44, 'phase-5',  600, 'jarvis'],
+      ['Calibrating neural-link telemetry…',         0.56, 'phase-6',  550, 'friday'],
+      ['Synchronizing quantum bus interface…',       0.68, 'phase-7',  500, 'friday'],
+      ['Activating HUD overlay subsystems…',         0.80, 'phase-8',  450, 'friday'],
+      ['Tactical acquisition sweep online…',         0.92, 'phase-9',  400, 'edith'],
+      ['All systems verified. Welcome back, sir.',   1.00, 'phase-10', 600, 'jarvis'],
     ];
 
     for (const [label, progress, phase, dwellMs, era] of steps) {
       this._setBootPhase(phase);
       this._setAiEra(era);
-      this._bootLog(label);
+      await this._bootLogTyped(label);
       if (this.dom.bootProgressFill) {
         this.dom.bootProgressFill.style.width = `${Math.round(progress * 100)}%`;
+      }
+      // Flash reactor on key phases
+      if (phase === 'phase-5' || phase === 'phase-10') {
+        this._flashBootReactor();
       }
       await this._sleep(dwellMs);
     }
 
     this._setBootPhase('complete');
+  }
+
+  /** Flash the boot reactor for dramatic effect */
+  _flashBootReactor() {
+    const reactor = this.dom.bootOverlay?.querySelector('.boot-reactor');
+    if (!reactor) return;
+    reactor.classList.add('reactor-flash');
+    setTimeout(() => reactor.classList.remove('reactor-flash'), 600);
   }
 
   _setBootPhase(phase) {
@@ -226,19 +241,53 @@ class JarvisApp {
     }
   }
 
-  /** Complete boot — hide overlay, show HUD */
-  _completeBoot() {
+  /** Complete boot — mechanical staggered panel reveal using Web Animations API */
+  async _completeBoot() {
     this.booted = true;
     this._applyUiMode(false);
     this._setAiEra('jarvis');
     document.body.classList.remove('startup-sequence');
     delete document.body.dataset.startupPhase;
+
     if (this.dom.bootOverlay) {
       this.dom.bootOverlay.classList.add('hidden');
     }
+
     if (this.dom.hudRoot) {
       delete this.dom.hudRoot.dataset.startupPhase;
       this.dom.hudRoot.classList.add('booted');
+    }
+
+    // Staggered mechanical panel reveal — uses Web Animations API (fires ONCE, never repeats)
+    const panels = [
+      { el: document.querySelector('.top-bar'), delay: 0, from: { transform: 'translateY(-28px) scaleY(0.85)', opacity: 0, filter: 'brightness(2.5) blur(3px)' } },
+      { el: document.querySelector('.left-panel'), delay: 140, from: { transform: 'translateX(-36px) scaleX(0.88)', opacity: 0, filter: 'brightness(2) blur(3px)' } },
+      { el: document.querySelector('.center-panel'), delay: 320, from: { transform: 'scale(0.7) rotate(-2deg)', opacity: 0, filter: 'brightness(3) blur(5px) saturate(0.4)' } },
+      { el: document.querySelector('.right-panel'), delay: 500, from: { transform: 'translateX(36px) scaleX(0.88)', opacity: 0, filter: 'brightness(2) blur(3px)' } },
+      { el: document.querySelector('.bottom-bar'), delay: 640, from: { transform: 'translateY(28px) scaleY(0.85)', opacity: 0, filter: 'brightness(2.5) blur(3px)' } },
+    ];
+
+    const to = { transform: 'none', opacity: 1, filter: 'brightness(1) blur(0) saturate(1)' };
+
+    for (const { el, delay, from } of panels) {
+      if (!el) continue;
+      if (delay > 0) await this._sleep(delay);
+
+      // One-shot Web Animation — plays once, commits final state, done.
+      el.animate([from, to], {
+        duration: 550,
+        easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+        fill: 'forwards',
+      });
+    }
+
+    // After all panels are revealed, ensure clean state
+    await this._sleep(600);
+    for (const { el } of panels) {
+      if (!el) continue;
+      el.style.opacity = '1';
+      el.style.transform = 'none';
+      el.style.filter = 'none';
     }
   }
 
@@ -307,7 +356,6 @@ class JarvisApp {
         this.gauges.update(payload);
         this._updateStressLevel(payload);
         this._updateArmorTelemetry(payload);
-        this._updateMissionOverlays(payload);
         this._triggerTelemetryPulse(payload);
         break;
 
@@ -790,18 +838,15 @@ class JarvisApp {
     return false;
   }
 
-  /** ── Voice State Display ────────────────────────────────────── */
+  /** ── Voice State Display (stable — no animation re-triggering) */
   _setVoiceState(state) {
     const el = this.dom.voiceState;
     if (!el) return;
 
     el.textContent = state;
     el.setAttribute('data-state', state);
-    el.classList.remove('voice-state-ping');
-    void el.offsetWidth;
-    el.classList.add('voice-state-ping');
+    // Voice state indicator uses CSS transitions, not animation re-triggers
 
-    // Update Three.js worker
     if (this.threeWorker) {
       this.threeWorker.postMessage({ type: 'set_state', state });
     }
@@ -887,15 +932,12 @@ class JarvisApp {
     }
   }
 
-  /** ── Status Helpers ─────────────────────────────────────────── */
+  /** ── Status Helpers (NO animation re-triggering) ────────────── */
   _updateBackendPill(status, label) {
     const el = this.dom.backendStatus;
     if (!el) return;
     el.className = `status-pill ${status}`;
     el.textContent = `Backend: ${label}`;
-    el.classList.remove('pulse-notify');
-    void el.offsetWidth;
-    el.classList.add('pulse-notify');
   }
 
   _updateWsStatus(connected) {
@@ -903,9 +945,6 @@ class JarvisApp {
     if (!el) return;
     el.style.color = connected ? 'var(--green)' : 'var(--red)';
     el.textContent = connected ? 'WS: ●' : 'WS: ○';
-    el.classList.remove('pulse-notify');
-    void el.offsetWidth;
-    el.classList.add('pulse-notify');
   }
 
   _setModeStatus(enabled) {
@@ -922,12 +961,12 @@ class JarvisApp {
 
   _applyUiMode(clickthroughEnabled) {
     this._clickthroughUi = Boolean(clickthroughEnabled);
-    document.body.classList.add('ui-mode-switch');
-    setTimeout(() => document.body.classList.remove('ui-mode-switch'), 460);
+    // No animation class toggle — just swap modes. CSS transitions handle the rest.
     document.body.classList.toggle('clickthrough-ui', this._clickthroughUi);
     document.body.classList.toggle('normal-ui', !this._clickthroughUi);
   }
 
+  /** Telemetry pulse — NO CSS animation re-triggering. Only updates AI era via CSS vars. */
   _triggerTelemetryPulse(metrics) {
     if (!this.dom.hudRoot) return;
 
@@ -936,30 +975,10 @@ class JarvisApp {
     const ram = Number(metrics?.ram_percent || 0);
     const stress = Math.max(cpu, gpu, ram);
 
-    const stressBand = stress >= 92
-      ? 'critical'
-      : stress >= 80
-        ? 'high'
-        : stress >= 60
-          ? 'medium'
-          : 'low';
+    // Update stress CSS variable for subtle reactive styling (no animations)
+    this.dom.hudRoot.style.setProperty('--stress', (stress / 100).toFixed(3));
 
-    const now = Date.now();
-    const elapsed = now - this._lastTelemetryPulseAt;
-    const bandChanged = stressBand !== this._lastStressBand;
-    const shouldPulse = bandChanged || (stress >= 88 && elapsed > 1400) || elapsed > 9000;
-
-    this._lastStressBand = stressBand;
-
-    if (!shouldPulse) {
-      return;
-    }
-
-    this._lastTelemetryPulseAt = now;
-
-    this.dom.hudRoot.classList.remove('telemetry-pulse');
-    void this.dom.hudRoot.offsetWidth;
-    this.dom.hudRoot.classList.add('telemetry-pulse');
+    // Update AI era based on stress (just swaps CSS variables — no animation keyframes)
     if (stress >= 90) {
       this._setAiEra('edith');
     } else if (stress >= 68) {
@@ -967,17 +986,6 @@ class JarvisApp {
     } else {
       this._setAiEra('jarvis');
     }
-
-    this.dom.hudRoot.classList.toggle('stress-shock', stress >= 88);
-
-    if (this._telemetryPulseTimer) {
-      clearTimeout(this._telemetryPulseTimer);
-    }
-    this._telemetryPulseTimer = setTimeout(() => {
-      this.dom.hudRoot?.classList.remove('telemetry-pulse');
-      this.dom.hudRoot?.classList.remove('stress-shock');
-      this._telemetryPulseTimer = null;
-    }, 460);
   }
 
   _initCinematicHudRig() {
