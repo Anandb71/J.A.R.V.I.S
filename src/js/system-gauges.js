@@ -1,8 +1,8 @@
 /**
- * SystemGauges — Animated Arc Gauges with Smooth Transitions
+ * SystemGauges v3.0 — Premium Arc Gauges
  *
- * Each gauge smoothly interpolates to target values and changes
- * color based on load/stress level (cyan → amber → red).
+ * Smooth interpolation, stress-reactive colors with gradient arcs,
+ * glow effects, and Orbitron-style typography.
  */
 export class SystemGauges {
   constructor() {
@@ -38,9 +38,9 @@ export class SystemGauges {
         max: def.max,
         current: 0,
         target: 0,
-        color: '#00b4ff',
-        targetColor: [0, 180, 255],
-        currentColor: [0, 180, 255],
+        color: '#00d4ff',
+        targetColor: [0, 212, 255],
+        currentColor: [0, 212, 255],
       };
     }
 
@@ -115,7 +115,7 @@ export class SystemGauges {
 
     for (const gauge of Object.values(this.gauges)) {
       // Lerp current → target
-      gauge.current += (gauge.target - gauge.current) * 0.12;
+      gauge.current += (gauge.target - gauge.current) * 0.1;
 
       // Calculate stress ratio
       const ratio = gauge.max > 0 ? gauge.current / gauge.max : 0;
@@ -123,16 +123,16 @@ export class SystemGauges {
       // Color interpolation based on load
       let targetColor;
       if (ratio >= 0.9) {
-        targetColor = [255, 51, 102]; // red
+        targetColor = [239, 68, 68];  // red
       } else if (ratio >= 0.75) {
-        targetColor = [255, 184, 0]; // amber
+        targetColor = [245, 158, 11]; // gold/amber
       } else {
-        targetColor = [0, 180, 255]; // cyan
+        targetColor = [0, 212, 255];  // arc reactor cyan
       }
 
-      // Lerp color
+      // Lerp color smoothly
       gauge.currentColor = gauge.currentColor.map((c, i) =>
-        c + (targetColor[i] - c) * 0.08
+        c + (targetColor[i] - c) * 0.06
       );
 
       this._drawGauge(gauge, ratio);
@@ -142,7 +142,7 @@ export class SystemGauges {
   }
 
   /**
-   * Draw a single arc gauge
+   * Draw a single premium arc gauge with glow
    */
   _drawGauge(gauge, ratio) {
     const { canvas, ctx, label, unit, current, max } = gauge;
@@ -159,31 +159,33 @@ export class SystemGauges {
     ctx.clearRect(0, 0, w, h);
 
     const cx = w / 2;
-    const cy = h * 0.55;
-    const radius = Math.min(w, h) * 0.38;
-    const lineWidth = Math.max(4, radius * 0.13);
+    const cy = h * 0.52;
+    const radius = Math.min(w, h) * 0.36;
+    const lineWidth = Math.max(4, radius * 0.14);
     const startAngle = Math.PI * 0.75;
     const endAngle = Math.PI * 2.25;
 
-    // Background arc
+    // Background arc (subtle)
     ctx.beginPath();
     ctx.arc(cx, cy, radius, startAngle, endAngle);
-    ctx.strokeStyle = 'rgba(0, 180, 255, 0.08)';
+    ctx.strokeStyle = 'rgba(0, 212, 255, 0.06)';
     ctx.lineWidth = lineWidth;
     ctx.lineCap = 'round';
     ctx.stroke();
 
-    // 60% tick marks
-    const ticks = 12;
+    // Tick marks
+    const ticks = 16;
     for (let i = 0; i <= ticks; i++) {
       const angle = startAngle + (endAngle - startAngle) * (i / ticks);
-      const inner = radius - lineWidth * 0.8;
-      const outer = radius + lineWidth * 0.6;
+      const inner = radius - lineWidth * 0.6;
+      const outer = radius + lineWidth * 0.4;
       ctx.beginPath();
       ctx.moveTo(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner);
       ctx.lineTo(cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer);
-      ctx.strokeStyle = 'rgba(0, 180, 255, 0.06)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = i <= ticks * ratio
+        ? 'rgba(0, 212, 255, 0.12)'
+        : 'rgba(0, 212, 255, 0.04)';
+      ctx.lineWidth = 0.8;
       ctx.stroke();
     }
 
@@ -194,18 +196,49 @@ export class SystemGauges {
     if (clampedRatio > 0.005) {
       const [r, g, b] = gauge.currentColor.map(Math.round);
       const color = `rgb(${r}, ${g}, ${b})`;
+      const colorDim = `rgba(${r}, ${g}, ${b}, 0.3)`;
 
-      // Glow
+      // Outer glow
       ctx.shadowColor = color;
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 12;
+
+      // Gradient arc
+      const grad = ctx.createLinearGradient(
+        cx - radius, cy,
+        cx + radius, cy
+      );
+      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.65)`);
+      grad.addColorStop(0.5, color);
+      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.85)`);
 
       ctx.beginPath();
       ctx.arc(cx, cy, radius, startAngle, valueAngle);
-      ctx.strokeStyle = color;
+      ctx.strokeStyle = grad;
       ctx.lineWidth = lineWidth;
       ctx.lineCap = 'round';
       ctx.stroke();
 
+      // Inner glow line (thinner, brighter)
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, startAngle, valueAngle);
+      ctx.strokeStyle = `rgba(255, 255, 255, 0.15)`;
+      ctx.lineWidth = lineWidth * 0.3;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+
+      // Endpoint dot
+      const endX = cx + Math.cos(valueAngle) * radius;
+      const endY = cy + Math.sin(valueAngle) * radius;
+      ctx.beginPath();
+      ctx.arc(endX, endY, lineWidth * 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 8;
+      ctx.fill();
       ctx.shadowColor = 'transparent';
       ctx.shadowBlur = 0;
     }
@@ -221,20 +254,24 @@ export class SystemGauges {
     ctx.textBaseline = 'middle';
 
     // Big number
-    ctx.font = `bold ${Math.max(14, radius * 0.45)}px 'Bahnschrift', 'Segoe UI Semibold', sans-serif`;
-    ctx.fillStyle = '#e0f0ff';
+    const fontSize = Math.max(14, radius * 0.48);
+    ctx.font = `700 ${fontSize}px 'Orbitron', 'Bahnschrift', sans-serif`;
+    ctx.fillStyle = '#e2ecf4';
+    ctx.shadowColor = 'rgba(0, 212, 255, 0.2)';
+    ctx.shadowBlur = 10;
     ctx.fillText(String(displayValue), cx, cy - 2);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
 
     // Unit
-    ctx.font = `${Math.max(8, radius * 0.18)}px 'Bahnschrift', 'Segoe UI Semibold', sans-serif`;
-    ctx.fillStyle = 'rgba(100, 144, 170, 0.7)';
-    ctx.fillText(unit, cx, cy + radius * 0.32);
+    ctx.font = `500 ${Math.max(8, radius * 0.16)}px 'Inter', 'Segoe UI', sans-serif`;
+    ctx.fillStyle = 'rgba(122, 154, 181, 0.6)';
+    ctx.fillText(unit, cx, cy + radius * 0.3);
 
     // Label
-    ctx.font = `${Math.max(8, radius * 0.2)}px 'Bahnschrift', 'Segoe UI Semibold', sans-serif`;
-    ctx.fillStyle = 'rgba(0, 180, 255, 0.6)';
-    ctx.letterSpacing = '0.1em';
-    ctx.fillText(label, cx, cy + radius * 0.75);
+    ctx.font = `600 ${Math.max(8, radius * 0.18)}px 'Orbitron', 'Bahnschrift', sans-serif`;
+    ctx.fillStyle = 'rgba(0, 212, 255, 0.45)';
+    ctx.fillText(label, cx, cy + radius * 0.72);
   }
 
   /**
