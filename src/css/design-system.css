@@ -1,71 +1,124 @@
-/* ═══════════════════════════════════════════════════════════════
-   JARVIS Design System — Arc Reactor Aesthetic
-   ═══════════════════════════════════════════════════════════════ */
+/* ═════════════════════════════════════════════════════════════════════════════════
+   J.A.R.V.I.S. v20.0 Design System — Arc Reactor Aesthetic
+   Stark Industries Command Interface — STABLE BUILD
+   ═════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Google Fonts ─────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
 
 /* ── Color Tokens ─────────────────────────────────────────────── */
 :root {
-  /* Core palette */
-  --cyan:        #00b4ff;
-  --cyan-dim:    rgba(0, 180, 255, 0.35);
-  --cyan-glow:   rgba(0, 180, 255, 0.12);
-  --orange:      #ff6b35;
-  --orange-dim:  rgba(255, 107, 53, 0.35);
-  --purple:      #b44dff;
-  --purple-dim:  rgba(180, 77, 255, 0.3);
-  --green:       #00ff88;
-  --green-dim:   rgba(0, 255, 136, 0.3);
-  --amber:       #ffb800;
-  --amber-dim:   rgba(255, 184, 0, 0.3);
-  --red:         #ff3366;
-  --red-dim:     rgba(255, 51, 102, 0.3);
+  /* ─── Primary Arc Reactor Palette ─── */
+  --arc-core:       #00d4ff;
+  --arc-glow:       rgba(0, 212, 255, 0.55);
+  --arc-dim:        rgba(0, 212, 255, 0.18);
+  --arc-ghost:      rgba(0, 212, 255, 0.06);
 
-  /* Surfaces */
-  --bg:          #020812;
-  --ironman-surface:      rgba(12, 44, 72, 0.92);
-  --ironman-surface-soft: rgba(8, 31, 52, 0.92);
-  --panel:                var(--ironman-surface);
-  --panel-light:          var(--ironman-surface);
-  --panel-dark:           var(--ironman-surface-soft);
-  --glass:       rgba(0, 180, 255, 0.06);
+  /* ─── Holographic Accent ─── */
+  --holo-purple:    #a855f7;
+  --holo-purple-dim:rgba(168, 85, 247, 0.25);
+  --holo-blue:      #3b82f6;
+  --holo-blue-dim:  rgba(59, 130, 246, 0.2);
 
-  /* Text */
-  --text:        #e0f0ff;
-  --text-bright: #ffffff;
-  --text-dim:    #6890aa;
-  --text-muted:  #3d5a70;
+  /* ─── Stark Gold ─── */
+  --gold:           #f59e0b;
+  --gold-dim:       rgba(245, 158, 11, 0.25);
+  --gold-glow:      rgba(245, 158, 11, 0.12);
 
-  /* Borders & Lines */
-  --line:        rgba(0, 180, 255, 0.22);
-  --line-bright: rgba(0, 180, 255, 0.45);
-  --line-stress: rgba(0, 180, 255, 0.22);
+  /* ─── Status Colors ─── */
+  --green:          #10b981;
+  --green-dim:      rgba(16, 185, 129, 0.25);
+  --green-glow:     rgba(16, 185, 129, 0.12);
+  --amber:          #f59e0b;
+  --amber-dim:      rgba(245, 158, 11, 0.25);
+  --red:            #ef4444;
+  --red-dim:        rgba(239, 68, 68, 0.25);
+  --red-glow:       rgba(239, 68, 68, 0.12);
 
-  /* Spacing scale (4px base) */
+  /* Legacy compat aliases */
+  --cyan:           var(--arc-core);
+  --cyan-dim:       var(--arc-glow);
+  --cyan-glow:      var(--arc-ghost);
+  --orange:         #ff6b35;
+  --orange-dim:     rgba(255, 107, 53, 0.35);
+  --purple:         var(--holo-purple);
+  --purple-dim:     var(--holo-purple-dim);
+
+  /* ─── Surfaces ─── */
+  --bg:                 #030a14;
+  --bg-deep:            #010509;
+  --surface-1:          rgba(8, 24, 48, 0.85);
+  --surface-2:          rgba(12, 32, 58, 0.78);
+  --surface-3:          rgba(16, 40, 68, 0.72);
+  --surface-glass:      rgba(6, 20, 40, 0.65);
+  --surface-elevated:   rgba(14, 36, 62, 0.88);
+
+  /* Legacy compat */
+  --ironman-surface:      var(--surface-1);
+  --ironman-surface-soft: var(--surface-glass);
+  --panel:                var(--surface-1);
+  --panel-light:          var(--surface-2);
+  --panel-dark:           var(--surface-glass);
+  --glass:                var(--arc-ghost);
+
+  /* ─── Text ─── */
+  --text:            #e2ecf4;
+  --text-bright:     #ffffff;
+  --text-dim:        #7a9ab5;
+  --text-muted:      #3d5a72;
+  --text-accent:     var(--arc-core);
+
+  /* ─── Borders & Lines ─── */
+  --border:          rgba(0, 180, 255, 0.12);
+  --border-bright:   rgba(0, 212, 255, 0.32);
+  --border-glow:     rgba(0, 212, 255, 0.45);
+  --border-glass:    rgba(255, 255, 255, 0.06);
+  /* Legacy compat */
+  --line:            var(--border);
+  --line-bright:     var(--border-bright);
+  --line-stress:     var(--border);
+
+  /* ─── Spacing (4px base) ─── */
   --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;
   --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
   --sp-8: 32px; --sp-10: 40px;
 
-  /* Radii */
-  --r-sm: 0px;
-  --r-md: 0px;
-  --r-lg: 0px;
-  --r-xl: 0px;
-  --r-pill: 0px;
+  /* ─── Radii ─── */
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   14px;
+  --r-xl:   20px;
+  --r-pill: 100px;
+  --r-full: 50%;
 
-  /* Shadows */
-  --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 180, 255, 0.15);
-  --shadow-glow:  0 0 20px rgba(0, 180, 255, 0.15);
-  --shadow-neon:  0 0 8px var(--cyan-dim), 0 0 24px rgba(0, 180, 255, 0.08);
+  /* ─── Shadows ─── */
+  --shadow-panel:
+    0 4px 30px rgba(0, 0, 0, 0.5),
+    0 0 1px rgba(0, 212, 255, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-glow:
+    0 0 20px rgba(0, 212, 255, 0.15),
+    0 0 40px rgba(0, 212, 255, 0.05);
+  --shadow-neon:
+    0 0 8px var(--arc-glow),
+    0 0 24px var(--arc-dim);
+  --shadow-elevated:
+    0 8px 40px rgba(0, 0, 0, 0.6),
+    0 0 1px rgba(0, 212, 255, 0.2);
 
-  /* Timing */
-  --t-fast:   120ms;
-  --t-normal: 250ms;
-  --t-slow:   500ms;
-  --t-breath: 2.4s;
+  /* ─── Timing ─── */
+  --t-fast:    120ms;
+  --t-normal:  250ms;
+  --t-slow:    500ms;
+  --t-breath:  2.4s;
+  --ease-out:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* Reactive stress color (updated by JS) */
-  --stress-color: var(--cyan);
+  /* ─── Reactive (JS-driven) ─── */
+  --stress-color: var(--arc-core);
 
-  /* Z-index scale */
+  /* ─── Z-index ─── */
   --z-base:    1;
   --z-panel:   10;
   --z-overlay: 50;
@@ -79,44 +132,48 @@
 html, body {
   margin: 0;
   height: 100%;
-  font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', 'Segoe UI Variable Text', system-ui, -apple-system, sans-serif;
   color: var(--text);
   background: transparent;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
 /* ── Typography ───────────────────────────────────────────────── */
 .font-display {
-  font-family: 'Orbitron', 'Bahnschrift', 'Segoe UI Variable Display', 'Segoe UI Semibold', sans-serif;
+  font-family: 'Orbitron', 'Bahnschrift', sans-serif;
   letter-spacing: 0.06em;
   font-weight: 700;
 }
 
 .font-mono {
-  font-family: 'Cascadia Mono', 'JetBrains Mono', 'Consolas', 'SF Mono', monospace;
+  font-family: 'JetBrains Mono', 'Cascadia Mono', 'Consolas', monospace;
   letter-spacing: 0.02em;
 }
 
 .font-label {
-  font-family: 'Bahnschrift', 'Segoe UI Variable Text', 'Segoe UI Semibold', sans-serif;
-  letter-spacing: 0.04em;
+  font-family: 'Orbitron', 'Bahnschrift', sans-serif;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 500;
 }
 
-/* ── Panel System ─────────────────────────────────────────────── */
+/* ── Panel System — Glass Morphism ────────────────────────────── */
 .hud-panel {
-  border: none;
+  border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  background: var(--panel);
-  backdrop-filter: blur(10px) saturate(110%);
-  -webkit-backdrop-filter: blur(10px) saturate(110%);
+  background: var(--surface-1);
+  backdrop-filter: blur(18px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
   box-shadow: var(--shadow-panel);
   position: relative;
+  overflow: hidden;
 }
 
+/* Subtle scanline overlay on panels */
 .hud-panel::after {
   content: '';
   position: absolute;
@@ -125,12 +182,30 @@ html, body {
   pointer-events: none;
   background: repeating-linear-gradient(
     to bottom,
-    rgba(255, 255, 255, 0.015) 0px,
-    rgba(255, 255, 255, 0.015) 1px,
+    rgba(255, 255, 255, 0.012) 0px,
+    rgba(255, 255, 255, 0.012) 1px,
     transparent 1px,
     transparent 3px
   );
-  opacity: 0.28;
+  opacity: 0.32;
+  z-index: 0;
+}
+
+/* Glass gradient border glow (top edge highlight) */
+.hud-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 212, 255, 0.25) 20%,
+    rgba(168, 85, 247, 0.15) 50%,
+    rgba(0, 212, 255, 0.25) 80%,
+    transparent
+  );
+  z-index: 1;
 }
 
 /* ── Status Pills ─────────────────────────────────────────────── */
@@ -138,30 +213,32 @@ html, body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: none;
+  border: 1px solid var(--border);
   border-radius: var(--r-pill);
-  padding: 5px 12px;
-  font-size: 11px;
-  font-family: 'Bahnschrift', 'Segoe UI Semibold', sans-serif;
-  letter-spacing: 0.05em;
+  padding: 5px 14px;
+  font-size: 10px;
+  font-family: 'Orbitron', 'Bahnschrift', sans-serif;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
-  transition: all var(--t-normal) ease;
+  transition: all var(--t-normal) var(--ease-out);
+  background: var(--surface-glass);
+  backdrop-filter: blur(8px);
 }
 
 .status-pill.online {
   color: var(--green);
   border-color: var(--green-dim);
-  text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+  text-shadow: 0 0 8px var(--green-glow);
 }
 
 .status-pill.online::before {
   content: '';
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--green);
-  box-shadow: 0 0 6px var(--green);
+  box-shadow: 0 0 8px var(--green);
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
@@ -172,8 +249,8 @@ html, body {
 
 .status-pill.warn::before {
   content: '';
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--amber);
   animation: pulse-dot 1s ease-in-out infinite;
@@ -185,24 +262,26 @@ html, body {
 }
 
 .status-pill.stark {
-  color: #9ed0ff;
-  background: var(--ironman-surface);
-  box-shadow: 0 0 10px rgba(88, 170, 255, 0.18), inset 0 0 10px rgba(88, 170, 255, 0.08);
+  color: var(--arc-core);
+  background: linear-gradient(135deg, var(--surface-1), rgba(0, 212, 255, 0.06));
+  border-color: var(--arc-dim);
+  box-shadow: 0 0 12px var(--arc-dim), inset 0 0 12px var(--arc-ghost);
 }
 
 /* ── Buttons ──────────────────────────────────────────────────── */
 .hud-btn {
-  border: none;
+  border: 1px solid var(--border);
   border-radius: var(--r-md);
-  background: var(--ironman-surface);
+  background: var(--surface-2);
   color: var(--text);
-  font-family: 'Bahnschrift', 'Segoe UI Semibold', sans-serif;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
   font-size: 11px;
+  font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 8px 14px;
+  padding: 8px 16px;
   cursor: pointer;
-  transition: all var(--t-fast) ease;
+  transition: all var(--t-fast) var(--ease-out);
   position: relative;
   overflow: hidden;
 }
@@ -211,50 +290,58 @@ html, body {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, transparent, rgba(0, 180, 255, 0.08));
+  background: linear-gradient(135deg, transparent, rgba(0, 212, 255, 0.08));
   opacity: 0;
   transition: opacity var(--t-fast);
 }
 
 .hud-btn:hover {
-  box-shadow: 0 0 12px rgba(0, 180, 255, 0.2), inset 0 0 12px rgba(0, 180, 255, 0.05);
+  border-color: var(--border-bright);
+  box-shadow: 0 0 16px var(--arc-dim), inset 0 0 12px var(--arc-ghost);
   transform: translateY(-1px);
+  color: var(--text-bright);
 }
 
 .hud-btn:hover::before { opacity: 1; }
 
 .hud-btn:active {
   transform: translateY(0);
-  box-shadow: 0 0 6px rgba(0, 180, 255, 0.15);
+  box-shadow: 0 0 8px var(--arc-dim);
 }
 
 .hud-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
 .hud-btn.primary {
-  background: linear-gradient(135deg, rgba(0, 180, 255, 0.2), rgba(0, 120, 200, 0.15));
-  border-color: var(--cyan-dim);
-  color: var(--cyan);
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(0, 140, 210, 0.1));
+  border-color: rgba(0, 212, 255, 0.3);
+  color: var(--arc-core);
+  text-shadow: 0 0 12px var(--arc-dim);
 }
 
-/* ── Neon Utilities ───────────────────────────────────────────── */
+.hud-btn.primary:hover {
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.22), rgba(0, 140, 210, 0.15));
+  box-shadow: 0 0 20px var(--arc-dim), 0 0 40px var(--arc-ghost);
+}
+
+/* ── Glow Utilities ───────────────────────────────────────────── */
 .glow-cyan   { box-shadow: var(--shadow-neon); }
 .glow-orange { box-shadow: 0 0 8px var(--orange-dim), 0 0 24px rgba(255, 107, 53, 0.08); }
-.glow-purple { box-shadow: 0 0 8px var(--purple-dim), 0 0 24px rgba(180, 77, 255, 0.08); }
-.glow-green  { box-shadow: 0 0 8px var(--green-dim), 0 0 24px rgba(0, 255, 136, 0.08); }
+.glow-purple { box-shadow: 0 0 8px var(--holo-purple-dim), 0 0 24px rgba(168, 85, 247, 0.08); }
+.glow-green  { box-shadow: 0 0 8px var(--green-dim), 0 0 24px var(--green-glow); }
 
 /* ── Scrollbar ────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 180, 255, 0.2);
+  background: rgba(0, 212, 255, 0.18);
   border-radius: 4px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(0, 180, 255, 0.35); }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 212, 255, 0.35); }
 
 /* ── Keyframe Animations ──────────────────────────────────────── */
 @keyframes breathe {
@@ -264,17 +351,22 @@ html, body {
 
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.5; transform: scale(0.8); }
+  50%      { opacity: 0.4; transform: scale(0.75); }
 }
 
 @keyframes pulse-ring {
   0%   { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.8); opacity: 0; }
 }
 
 @keyframes scanline {
   0%   { transform: translateY(-100%); }
   100% { transform: translateY(100vh); }
+}
+
+@keyframes holo-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @keyframes flicker {
@@ -290,17 +382,17 @@ html, body {
 }
 
 @keyframes slide-up {
-  from { transform: translateY(12px); opacity: 0; }
-  to   { transform: translateY(0); opacity: 1; }
+  from { transform: translateY(16px); opacity: 0; filter: blur(4px); }
+  to   { transform: translateY(0); opacity: 1; filter: blur(0); }
 }
 
 @keyframes slide-in-left {
-  from { transform: translateX(-20px); opacity: 0; }
+  from { transform: translateX(-24px); opacity: 0; }
   to   { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes slide-in-right {
-  from { transform: translateX(20px); opacity: 0; }
+  from { transform: translateX(24px); opacity: 0; }
   to   { transform: translateX(0); opacity: 1; }
 }
 
@@ -310,9 +402,9 @@ html, body {
 }
 
 @keyframes boot-glow {
-  0%   { box-shadow: 0 0 0 rgba(0, 180, 255, 0); border-color: transparent; }
-  50%  { box-shadow: 0 0 30px rgba(0, 180, 255, 0.3); border-color: var(--cyan-dim); }
-  100% { box-shadow: var(--shadow-panel); border-color: var(--line); }
+  0%   { box-shadow: 0 0 0 rgba(0, 212, 255, 0); border-color: transparent; }
+  50%  { box-shadow: 0 0 40px rgba(0, 212, 255, 0.3); border-color: var(--arc-glow); }
+  100% { box-shadow: var(--shadow-panel); border-color: var(--border); }
 }
 
 @keyframes reactor-spin {
@@ -321,8 +413,20 @@ html, body {
 }
 
 @keyframes text-glow {
-  0%, 100% { text-shadow: 0 0 8px rgba(0, 180, 255, 0.3); }
-  50%      { text-shadow: 0 0 16px rgba(0, 180, 255, 0.6), 0 0 30px rgba(0, 180, 255, 0.2); }
+  0%, 100% { text-shadow: 0 0 8px rgba(0, 212, 255, 0.3); }
+  50%      { text-shadow: 0 0 20px rgba(0, 212, 255, 0.6), 0 0 40px rgba(0, 212, 255, 0.2); }
+}
+
+@keyframes gradient-border-spin {
+  from { --gradient-angle: 0deg; }
+  to   { --gradient-angle: 360deg; }
+}
+
+@keyframes ambient-drift {
+  0%, 100% { transform: translate(0, 0); }
+  25%      { transform: translate(2px, -3px); }
+  50%      { transform: translate(-1px, 2px); }
+  75%      { transform: translate(3px, 1px); }
 }
 
 /* ── Boot Sequence Overlay ────────────────────────────────────── */
@@ -334,9 +438,10 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at center, rgba(0, 20, 40, 0.95), rgba(2, 6, 12, 0.98));
-  transition: opacity 0.8s ease;
+  background: radial-gradient(ellipse at center, rgba(0, 20, 40, 0.96), var(--bg-deep));
+  transition: opacity 1s var(--ease-out);
   pointer-events: all;
+  overflow: hidden;
 }
 
 .boot-overlay.hidden {
@@ -344,55 +449,26 @@ html, body {
   pointer-events: none;
 }
 
-.boot-reactor {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  border: 2px solid var(--cyan-dim);
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: var(--sp-6);
-}
-
-.boot-reactor::before {
+/* Ambient grid behind boot */
+.boot-overlay::before {
   content: '';
   position: absolute;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 180, 255, 0.15);
-  animation: reactor-spin 3s linear infinite;
-  border-top-color: var(--cyan);
-}
-
-.boot-reactor::after {
-  content: '';
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--cyan), rgba(0, 180, 255, 0.3) 60%, transparent 70%);
-  box-shadow: 0 0 30px var(--cyan-dim), 0 0 60px rgba(0, 180, 255, 0.1);
-  animation: breathe var(--t-breath) ease-in-out infinite;
-}
-
-.boot-text {
-  font-family: 'Bahnschrift', 'Segoe UI Semibold', sans-serif;
-  font-size: 12px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--cyan);
-  text-shadow: 0 0 10px var(--cyan-dim);
-  animation: text-glow 2s ease-in-out infinite;
+  inset: 0;
+  background:
+    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: ambient-drift 20s linear infinite;
+  opacity: 0.5;
 }
 
 .boot-log {
   margin-top: var(--sp-4);
-  font-family: 'Cascadia Mono', 'Consolas', monospace;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
   font-size: 11px;
   color: var(--text-dim);
   text-align: center;
   min-height: 40px;
   transition: opacity 0.3s;
+  letter-spacing: 0.03em;
 }
