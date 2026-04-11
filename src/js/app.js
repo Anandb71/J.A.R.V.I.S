@@ -66,6 +66,13 @@ class JarvisApp {
     this._lastOverlayUpdateAt = 0;
     this._overlayUpdateIntervalMs = 420;
     this._minimalUi = false;
+    this._bootAnimRaf = null;
+    this._bootAnimStartedAt = 0;
+    this._bootCanvasCtx = null;
+    this._bootParticles = [];
+    this._bootResizeHandler = null;
+    this._bootSuitModel = null;
+    this._bootSuitModelLoadPromise = null;
   }
 
   /** ── Boot Sequence — Cinematic v5.0 ──────────────────────────── */
@@ -73,42 +80,39 @@ class JarvisApp {
     this._cacheDOM();
     document.body.classList.add('startup-sequence');
     this._setAiEra('jarvis');
-    // NOTE: do NOT add 'booted' class here — that triggers panel animations prematurely
-    await this._bootLogTyped('Initializing arc-reactor core subsystem…');
+
+    // Run suit-up sequence (15 phases)
     await this._runStartupSequence();
+
+    // Init subsystems while overlay is still up
     this._initHealthMatrix();
     this._startClock();
-
-    // Initialize sub-systems
     this.chat = new ChatPanel(this.dom.chatPanel);
     this.gauges = new SystemGauges();
-
     this.gauges.init();
     this._initThreeJs();
     this._initCinematicHudRig();
     this._startCodeStream();
     this._startExpressionRig();
-
-    // Start WebSocket
     this._connectWebSocket();
-    await this._bootLogTyped('Linking tactical command bus…');
-    await this._sleep(120);
 
-    // Complete boot — this is where 'booted' class is added
-    await this._bootLogTyped('J.A.R.V.I.S. v25.0 — ALL SYSTEMS ONLINE');
-    await this._sleep(140);
+    // Complete boot — reveal HUD
     this._completeBoot();
     this._bindUI();
     this._startWeatherLoop();
-    this.chat.addSystem('J.A.R.V.I.S. online.');
+    this.chat.addSystem('J.A.R.V.I.S. v25.0 is online. All systems nominal. At your service, sir.');
   }
 
   /** Cache DOM references */
   _cacheDOM() {
     this.dom = {
       bootOverlay: document.getElementById('boot-overlay'),
+      bootCanvas: document.getElementById('boot-canvas'),
       bootLog: document.getElementById('boot-log'),
       bootProgressFill: document.getElementById('boot-progress-fill'),
+      bootSidePanel: document.getElementById('boot-side-panel'),
+      bootCounter: document.getElementById('boot-counter'),
+      bootLoadingText: document.getElementById('boot-loading-text'),
       hudRoot: document.getElementById('hud-root'),
       clock: document.getElementById('clock'),
       calendar: document.getElementById('calendar'),
@@ -184,44 +188,908 @@ class JarvisApp {
     await this._sleep(30);
   }
 
-  /** ── Boot Sequence — Cinematic v25.0 ──────────────────── */
+  /** ── CINEMATIC BOOT SEQUENCE v28.0 (SPEC-ACCURATE) ──────────────── */
   async _runStartupSequence() {
-    const steps = [
-      ['Engaging blast-door lockdown protocol…',     0.08, 'phase-1',  220, 'jarvis'],
-      ['Pressurizing cockpit containment frame…',    0.18, 'phase-2',  200, 'jarvis'],
-      ['Docking upper and lower armor rails…',       0.30, 'phase-3',  220, 'jarvis'],
-      ['Latching lateral armor modules…',            0.42, 'phase-4',  220, 'jarvis'],
-      ['Spinning arc-reactor core lattice…',         0.56, 'phase-5',  260, 'jarvis'],
-      ['Calibrating neural-link telemetry…',         0.68, 'phase-6',  240, 'friday'],
-      ['Synchronizing quantum bus interface…',       0.78, 'phase-7',  220, 'friday'],
-      ['Activating HUD overlay subsystems…',         0.88, 'phase-8',  200, 'friday'],
-      ['Tactical acquisition sweep online…',         0.96, 'phase-9',  170, 'edith'],
-      ['All systems verified. Welcome back, sir.',   1.00, 'phase-10', 220, 'jarvis'],
-    ];
+    await this._loadBootSuitModel();
+    this._startBootCinematic();
+    this._setBootPhase('phase-1');
+    this._bootLog('INITIATING SYSTEM 1....');
+    await this._sleep(2800);
+    this._speakBootLine('Welcome back, sir.');
 
-    for (const [label, progress, phase, dwellMs, era] of steps) {
-      this._setBootPhase(phase);
-      this._setAiEra(era);
-      await this._bootLogTyped(label);
-      if (this.dom.bootProgressFill) {
-        this.dom.bootProgressFill.style.width = `${Math.round(progress * 100)}%`;
-      }
-      // Flash reactor on key phases
-      if (phase === 'phase-5' || phase === 'phase-10') {
-        this._flashBootReactor();
-      }
-      await this._sleep(dwellMs);
-    }
+    this._setBootPhase('phase-2');
+    this._bootLog('CHECKSUM: OK');
+    await this._sleep(2900);
+    this._speakBootLine('Core systems synchronized.');
+
+    this._setBootPhase('phase-3');
+    await this._sleep(3600);
+    this._speakBootLine('Deploying tactical schematics.');
+
+    this._setBootPhase('phase-4');
+    this._bootLog('ARC REACTOR IGNITION');
+    this._speakBootLine('Arc reactor online. All systems are now fully operational.');
+    await this._sleep(2800);
 
     this._setBootPhase('complete');
+    await this._sleep(260);
+    this._stopBootCinematic();
+  }
+
+  _setBootLoadingText(text) {
+    if (this.dom.bootLoadingText) {
+      this.dom.bootLoadingText.textContent = text;
+    }
+  }
+
+  async _runBootCounter(from, to, durationMs) {
+    const el = this.dom.bootCounter;
+    if (!el) return;
+    const start = performance.now();
+    while (true) {
+      const t = Math.min(1, (performance.now() - start) / durationMs);
+      const eased = 1 - ((1 - t) * (1 - t));
+      el.textContent = String(Math.round(from + (to - from) * eased));
+      if (t >= 1) break;
+      await this._sleep(16);
+    }
+  }
+
+  async _loadBootSuitModel() {
+    if (this._bootSuitModel) return this._bootSuitModel;
+    if (this._bootSuitModelLoadPromise) return this._bootSuitModelLoadPromise;
+
+    this._bootSuitModelLoadPromise = (async () => {
+      try {
+        let text = null;
+
+        if (window.jarvis?.readAssetText) {
+          text = await window.jarvis.readAssetText('assets/models/IronMan/IronMan.obj');
+        }
+
+        if (!text) {
+          const candidates = [
+            'assets/models/IronMan/IronMan.obj',
+            './assets/models/IronMan/IronMan.obj',
+            '../assets/models/IronMan/IronMan.obj',
+          ];
+
+          for (const p of candidates) {
+            const resp = await fetch(p).catch(() => null);
+            if (resp?.ok) {
+              text = await resp.text();
+              break;
+            }
+          }
+        }
+
+        if (!text) throw new Error('obj unavailable');
+        this._bootSuitModel = this._parseObjWireframe(text);
+      } catch {
+        this._bootSuitModel = null;
+      }
+      return this._bootSuitModel;
+    })();
+
+    return this._bootSuitModelLoadPromise;
+  }
+
+  _parseObjWireframe(objText) {
+    const vertices = [];
+    const edgeSet = new Set();
+
+    const lines = objText.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i].trim();
+      if (!line || line.startsWith('#')) continue;
+
+      if (line.startsWith('v ')) {
+        const p = line.split(/\s+/);
+        if (p.length >= 4) {
+          vertices.push([Number(p[1]), Number(p[2]), Number(p[3])]);
+        }
+        continue;
+      }
+
+      if (line.startsWith('f ')) {
+        const p = line.split(/\s+/).slice(1);
+        const idx = p.map((t) => Number((t.split('/')[0] || '0')) - 1).filter((n) => n >= 0);
+        if (idx.length < 2) continue;
+        for (let j = 0; j < idx.length; j += 1) {
+          const a = idx[j];
+          const b = idx[(j + 1) % idx.length];
+          const k = a < b ? `${a}_${b}` : `${b}_${a}`;
+          edgeSet.add(k);
+        }
+      }
+    }
+
+    if (!vertices.length || !edgeSet.size) return null;
+
+    let minX = Infinity; let minY = Infinity; let minZ = Infinity;
+    let maxX = -Infinity; let maxY = -Infinity; let maxZ = -Infinity;
+    for (let i = 0; i < vertices.length; i += 1) {
+      const [x, y, z] = vertices[i];
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+
+    const cx = (minX + maxX) * 0.5;
+    const cy = (minY + maxY) * 0.5;
+    const cz = (minZ + maxZ) * 0.5;
+    const size = Math.max(maxX - minX, maxY - minY, maxZ - minZ) || 1;
+
+    const normalized = vertices.map(([x, y, z]) => [
+      (x - cx) / size,
+      -(y - cy) / size,
+      (z - cz) / size,
+    ]);
+
+    const edges = [];
+    edgeSet.forEach((k) => {
+      const [a, b] = k.split('_').map((n) => Number(n));
+      edges.push([a, b]);
+    });
+
+    // Cap density for runtime stability during boot
+    const maxEdges = 4200;
+    if (edges.length > maxEdges) {
+      const step = Math.ceil(edges.length / maxEdges);
+      const sampled = [];
+      for (let i = 0; i < edges.length; i += step) sampled.push(edges[i]);
+      return { vertices: normalized, edges: sampled };
+    }
+
+    return { vertices: normalized, edges };
+  }
+
+  _startBootCinematic() {
+    const canvas = this.dom.bootCanvas;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    this._bootCanvasCtx = ctx;
+    this._bootAnimStartedAt = performance.now();
+    this._bootParticles = Array.from({ length: 480 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      vx: (Math.random() - 0.5) * 0.002,
+      vy: (Math.random() - 0.5) * 0.002,
+      s: 0.5 + Math.random() * 2.1,
+      a: 0.2 + Math.random() * 0.75,
+      c: Math.random() > 0.88 ? 'magenta' : (Math.random() > 0.73 ? 'white' : 'cyan'),
+    }));
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const w = Math.max(1, window.innerWidth);
+      const h = Math.max(1, window.innerHeight);
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    resize();
+    this._bootResizeHandler = resize;
+    window.addEventListener('resize', resize);
+
+    const tick = (ts) => {
+      const elapsed = (ts - this._bootAnimStartedAt) / 1000;
+      this._drawBootFrame(elapsed);
+      this._bootAnimRaf = requestAnimationFrame(tick);
+    };
+
+    this._bootAnimRaf = requestAnimationFrame(tick);
+  }
+
+  _stopBootCinematic() {
+    if (this._bootAnimRaf) {
+      cancelAnimationFrame(this._bootAnimRaf);
+      this._bootAnimRaf = null;
+    }
+    if (this._bootResizeHandler) {
+      window.removeEventListener('resize', this._bootResizeHandler);
+      this._bootResizeHandler = null;
+    }
+  }
+
+  _drawBootFrame(t) {
+    const ctx = this._bootCanvasCtx;
+    if (!ctx) return;
+
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    // Global environment: strict pure black
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, w, h);
+
+    if (t < 2.8) {
+      this._drawIgnitionBoot(ctx, cx, cy, w, h, t);
+      return;
+    }
+
+    if (t < 5.7) {
+      this._drawCircularJarvisHud(ctx, cx, cy, t - 2.8);
+      return;
+    }
+
+    if (t < 9.1) {
+      this._drawSystemSchematics(ctx, cx, cy, w, h, t - 5.7);
+      return;
+    }
+
+    this._drawArcReactorFinale(ctx, cx, cy, w, h, t - 9.1);
+  }
+
+  _drawIgnitionBoot(ctx, cx, cy, w, h, t) {
+    const cyan = '#00E5FF';
+    const glow = 'rgba(0,136,170,0.95)';
+    const pulse = 0.7 + (Math.sin(t * 20) * 0.15) + (Math.sin(t * 42) * 0.08);
+
+    // 1px center ignition line + strict 45° tech brackets
+    ctx.strokeStyle = cyan;
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 14;
+    ctx.lineWidth = 1;
+
+    const lBreak = w * 0.33;
+    const rBreak = w * 0.67;
+    const rise = 20;
+    const flat = 100;
+
+    ctx.beginPath();
+    ctx.moveTo(0, cy);
+    ctx.lineTo(lBreak, cy);
+    ctx.lineTo(lBreak + rise, cy - rise);
+    ctx.lineTo(lBreak + rise + flat, cy - rise);
+    ctx.lineTo(lBreak + (rise * 2) + flat, cy);
+    ctx.lineTo(rBreak - (rise * 2) - flat, cy);
+    ctx.lineTo(rBreak - rise - flat, cy - rise);
+    ctx.lineTo(rBreak - rise, cy - rise);
+    ctx.lineTo(rBreak, cy);
+    ctx.lineTo(w, cy);
+    ctx.stroke();
+
+    // Optical flare: white core + stretched blue halo
+    const flareW = Math.min(420, w * 0.3);
+    const halo = ctx.createRadialGradient(cx, cy, 2, cx, cy, flareW * 0.5);
+    halo.addColorStop(0, `rgba(255,255,255,${Math.min(1, pulse + 0.15)})`);
+    halo.addColorStop(0.14, `rgba(110,220,255,${0.75 * pulse})`);
+    halo.addColorStop(1, 'rgba(0,229,255,0)');
+    ctx.fillStyle = halo;
+    ctx.fillRect(cx - flareW * 0.55, cy - 46, flareW * 1.1, 92);
+
+    // Main header text
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = cyan;
+    ctx.font = '700 32px Orbitron, Rajdhani, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('INITIATING SYSTEM 1....', cx, cy - 46);
+
+    // Loading bar with discrete blocks and non-linear fill
+    const bw = Math.min(460, w * 0.42);
+    const bh = 16;
+    const bx = cx - (bw / 2);
+    const by = cy - 30;
+    ctx.strokeStyle = 'rgba(0,229,255,0.95)';
+    ctx.shadowBlur = 10;
+    ctx.strokeRect(bx, by, bw, bh);
+
+    let progress = 0;
+    if (t < 1.1) progress = (t / 1.1) * 0.38;
+    else if (t < 1.35) progress = 0.38;
+    else progress = 0.38 + ((t - 1.35) / 1.45) * 0.62;
+    progress = Math.max(0, Math.min(1, progress));
+
+    const blocks = 24;
+    const gap = 2;
+    const blockW = (bw - gap * (blocks + 1)) / blocks;
+    const fillCount = Math.floor(progress * blocks);
+    for (let i = 0; i < fillCount; i += 1) {
+      const x = bx + gap + (i * (blockW + gap));
+      ctx.fillStyle = 'rgba(0,229,255,0.92)';
+      ctx.fillRect(x, by + 3, blockW, bh - 6);
+    }
+
+    // Subtext flashing data
+    const lines = [
+      'RELEASING CONFIGURATION',
+      'REMOVE SYSTEM CONFIGURATION',
+      'EXTEND SYSTEM MEMORY: NO',
+      'REMOVE',
+      'CHECKSUM: OK',
+    ];
+    const idx = t > 2.2 ? 4 : Math.floor(t * 12) % 4;
+    ctx.textAlign = 'left';
+    ctx.font = '600 11px Orbitron, Rajdhani, sans-serif';
+    ctx.fillStyle = 'rgba(0,229,255,0.9)';
+    ctx.fillText(lines[idx], lBreak + 24, cy + 28);
+  }
+
+  _drawCircularJarvisHud(ctx, cx, cy, t) {
+    const cyan = '#00E5FF';
+    const a = Math.min(1, t / 0.7);
+    const z = 0.9 + (Math.min(1, t / 1.0) * 0.1);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(z, z);
+    ctx.shadowColor = 'rgba(0,136,170,0.9)';
+    ctx.shadowBlur = 14;
+
+    // Ring 1 outer thick low opacity
+    ctx.save();
+    ctx.rotate(t * 0.22);
+    ctx.strokeStyle = 'rgba(0,229,255,0.2)';
+    ctx.lineWidth = 16;
+    ctx.beginPath();
+    ctx.arc(0, 0, 260, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // Ring 2 thin line
+    ctx.save();
+    ctx.rotate(-t * 0.55);
+    ctx.strokeStyle = 'rgba(0,229,255,0.86)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, 210, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // Ring 3 dashed curved blocks
+    ctx.save();
+    ctx.rotate(t * -1.15);
+    ctx.strokeStyle = 'rgba(0,229,255,0.72)';
+    ctx.lineWidth = 8;
+    for (let i = 0; i < 26; i += 1) {
+      const s = (i / 26) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 170, s, s + 0.12);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Ring 4 ruler ticks outward
+    ctx.save();
+    ctx.rotate(t * 0.9);
+    ctx.strokeStyle = 'rgba(0,229,255,0.62)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 180; i += 1) {
+      const ang = (i / 180) * Math.PI * 2;
+      const r1 = 130;
+      const r2 = 138 + (i % 5 === 0 ? 5 : 0);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(ang) * r1, Math.sin(ang) * r1);
+      ctx.lineTo(Math.cos(ang) * r2, Math.sin(ang) * r2);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Ring 5 inner mechanical gear-like cutouts
+    ctx.save();
+    ctx.rotate(-t * 0.38);
+    ctx.strokeStyle = cyan;
+    ctx.lineWidth = 14;
+    for (let i = 0; i < 10; i += 1) {
+      const s = (i / 10) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 88, s, s + 0.42);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Center text fade + slight zoom
+    ctx.globalAlpha = a;
+    ctx.fillStyle = cyan;
+    ctx.font = '700 52px Orbitron, Rajdhani, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('J.A.R.V.I.S', 0, 18);
+
+    ctx.restore();
+  }
+
+  _drawSystemSchematics(ctx, cx, cy, w, h, t) {
+    // Faint 10x10 grid background
+    ctx.strokeStyle = 'rgba(0,229,255,0.08)';
+    ctx.lineWidth = 1;
+    const cell = Math.max(60, Math.min(110, Math.round(w / 20)));
+    for (let x = 0; x <= w; x += cell) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= h; y += cell) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(w, y + 0.5);
+      ctx.stroke();
+    }
+
+    // Left top: arc reactor blueprint
+    this._drawArcBlueprint(ctx, w * 0.16, h * 0.22, 84);
+
+    // Left bottom: miniature rotating JARVIS HUD
+    ctx.save();
+    ctx.translate(w * 0.2, h * 0.77);
+    ctx.scale(0.34, 0.34);
+    this._drawCircularJarvisHud(ctx, 0, 0, t * 1.7);
+    ctx.restore();
+
+    // Right UI schematics
+    this._drawHelmetSchematic(ctx, w * 0.83, h * 0.24, 126, 80);
+    this._drawGauntletSchematic(ctx, w * 0.82, h * 0.49, 134, 72);
+    this._drawSuitViews(ctx, w * 0.82, h * 0.77, 170, 96);
+
+    // Centerpiece: dark crimson wireframe model
+    this._drawRotatingWireframeSuit(ctx, cx, cy + 20, 160, t);
+  }
+
+  _drawArcBlueprint(ctx, x, y, r) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = 'rgba(0,229,255,0.72)';
+    ctx.fillStyle = 'rgba(0,229,255,0.82)';
+    ctx.shadowColor = 'rgba(0,136,170,0.75)';
+    ctx.shadowBlur = 10;
+    ctx.font = '600 10px Orbitron, Rajdhani, sans-serif';
+    ctx.fillText('RELEASE REQUIREMENTS', -r, -r - 24);
+    [1, 0.74, 0.52, 0.32].forEach((k) => {
+      ctx.beginPath();
+      ctx.arc(0, 0, r * k, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+    ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.stroke();
+    ctx.restore();
+  }
+
+  _drawHelmetSchematic(ctx, x, y, w, h) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = 'rgba(0,229,255,0.66)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.4, -h * 0.1);
+    ctx.quadraticCurveTo(-w * 0.1, -h * 0.5, w * 0.2, -h * 0.25);
+    ctx.quadraticCurveTo(w * 0.45, -h * 0.05, w * 0.42, h * 0.18);
+    ctx.quadraticCurveTo(w * 0.2, h * 0.38, -w * 0.1, h * 0.3);
+    ctx.quadraticCurveTo(-w * 0.35, h * 0.15, -w * 0.4, -h * 0.1);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  _drawGauntletSchematic(ctx, x, y, w, h) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = 'rgba(0,229,255,0.62)';
+    ctx.lineWidth = 1.1;
+    ctx.strokeRect(-w * 0.45, -h * 0.25, w * 0.55, h * 0.5);
+    ctx.beginPath();
+    ctx.arc(w * 0.16, 0, h * 0.34, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.12, -h * 0.15);
+    ctx.lineTo(w * 0.33, h * 0.15);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  _drawSuitViews(ctx, x, y, w, h) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = 'rgba(0,229,255,0.56)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-w * 0.5, -h * 0.5, w * 0.4, h);
+    ctx.strokeRect(w * 0.1, -h * 0.5, w * 0.4, h);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.3, -h * 0.5);
+    ctx.lineTo(-w * 0.3, h * 0.5);
+    ctx.moveTo(w * 0.3, -h * 0.5);
+    ctx.lineTo(w * 0.3, h * 0.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  _drawRotatingWireframeSuit(ctx, cx, cy, scale, t) {
+    if (this._bootSuitModel?.vertices?.length && this._bootSuitModel?.edges?.length) {
+      const { vertices, edges } = this._bootSuitModel;
+      const rotY = t * 0.9;
+      const rotX = -0.12;
+      const dist = 2.1;
+      const projected = new Array(vertices.length);
+
+      for (let i = 0; i < vertices.length; i += 1) {
+        const [x0, y0, z0] = vertices[i];
+        const x1 = (x0 * Math.cos(rotY)) + (z0 * Math.sin(rotY));
+        const z1 = (-x0 * Math.sin(rotY)) + (z0 * Math.cos(rotY));
+        const y2 = (y0 * Math.cos(rotX)) - (z1 * Math.sin(rotX));
+        const z2 = (y0 * Math.sin(rotX)) + (z1 * Math.cos(rotX));
+        const p = dist / (dist - z2);
+        projected[i] = [cx + (x1 * scale * 2.25 * p), cy + (y2 * scale * 2.25 * p), z2];
+      }
+
+      ctx.save();
+      ctx.lineWidth = 1.7;
+      ctx.strokeStyle = 'rgba(255,40,120,0.98)';
+      ctx.shadowColor = 'rgba(255,40,120,0.92)';
+      ctx.shadowBlur = 16;
+      ctx.globalAlpha = 1;
+
+      for (let i = 0; i < edges.length; i += 1) {
+        const [a, b] = edges[i];
+        const p1 = projected[a];
+        const p2 = projected[b];
+        if (!p1 || !p2) continue;
+        ctx.beginPath();
+        ctx.moveTo(p1[0], p1[1]);
+        ctx.lineTo(p2[0], p2[1]);
+        ctx.stroke();
+      }
+
+      // reinforce silhouette points to avoid "empty" look at a glance
+      ctx.fillStyle = 'rgba(255,80,150,0.9)';
+      for (let i = 0; i < projected.length; i += 6) {
+        const p = projected[i];
+        if (!p) continue;
+        ctx.fillRect(p[0], p[1], 1.8, 1.8);
+      }
+
+      // subtle accent lines
+      ctx.strokeStyle = 'rgba(0,229,255,0.45)';
+      ctx.lineWidth = 1.1;
+      for (let i = 0; i < edges.length; i += 23) {
+        const [a, b] = edges[i];
+        const p1 = projected[a];
+        const p2 = projected[b];
+        if (!p1 || !p2) continue;
+        ctx.beginPath();
+        ctx.moveTo(p1[0], p1[1]);
+        ctx.lineTo(p2[0], p2[1]);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+
+    const pts = {
+      headTop: [0, -1.15, 0], headL: [-0.17, -0.98, 0.08], headR: [0.17, -0.98, 0.08],
+      neck: [0, -0.86, 0],
+      shL: [-0.42, -0.72, 0.08], shR: [0.42, -0.72, 0.08],
+      chestL: [-0.32, -0.4, 0.14], chestR: [0.32, -0.4, 0.14],
+      waistL: [-0.24, -0.03, 0.1], waistR: [0.24, -0.03, 0.1],
+      hipL: [-0.22, 0.2, 0.06], hipR: [0.22, 0.2, 0.06],
+      kneeL: [-0.16, 0.62, 0.03], kneeR: [0.16, 0.62, 0.03],
+      footL: [-0.14, 1.0, 0.12], footR: [0.14, 1.0, 0.12],
+      elL: [-0.6, -0.28, 0.02], elR: [0.6, -0.28, 0.02],
+      handL: [-0.55, 0.14, 0.08], handR: [0.55, 0.14, 0.08],
+    };
+
+    const edges = [
+      ['headTop', 'headL'], ['headTop', 'headR'], ['headL', 'neck'], ['headR', 'neck'],
+      ['neck', 'shL'], ['neck', 'shR'], ['shL', 'chestL'], ['shR', 'chestR'], ['chestL', 'chestR'],
+      ['chestL', 'waistL'], ['chestR', 'waistR'], ['waistL', 'waistR'], ['waistL', 'hipL'], ['waistR', 'hipR'],
+      ['hipL', 'kneeL'], ['hipR', 'kneeR'], ['kneeL', 'footL'], ['kneeR', 'footR'],
+      ['shL', 'elL'], ['elL', 'handL'], ['shR', 'elR'], ['elR', 'handR'],
+    ];
+
+    const rot = t * 0.9;
+    const dist = 2.6;
+    const proj = {};
+    Object.entries(pts).forEach(([k, p]) => {
+      const [x, y, z] = p;
+      const xr = (x * Math.cos(rot)) + (z * Math.sin(rot));
+      const zr = (-x * Math.sin(rot)) + (z * Math.cos(rot));
+      const persp = dist / (dist - zr);
+      proj[k] = [cx + (xr * scale * persp), cy + (y * scale * persp), zr];
+    });
+
+    ctx.save();
+    ctx.lineWidth = 1.3;
+    ctx.strokeStyle = 'rgba(169,0,51,0.95)';
+    ctx.shadowColor = 'rgba(169,0,51,0.68)';
+    ctx.shadowBlur = 12;
+    edges.forEach(([a, b], i) => {
+      const p1 = proj[a];
+      const p2 = proj[b];
+      ctx.globalAlpha = 0.52 + ((Math.sin(t * 4 + i) + 1) * 0.14);
+      ctx.beginPath();
+      ctx.moveTo(p1[0], p1[1]);
+      ctx.lineTo(p2[0], p2[1]);
+      ctx.stroke();
+    });
+
+    // faint green/yellow accents
+    ctx.globalAlpha = 0.46;
+    ctx.strokeStyle = 'rgba(145,255,120,0.62)';
+    ctx.beginPath();
+    ctx.moveTo(proj.chestL[0], proj.chestL[1]);
+    ctx.lineTo(proj.waistR[0], proj.waistR[1]);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,235,120,0.54)';
+    ctx.beginPath();
+    ctx.moveTo(proj.shL[0], proj.shL[1]);
+    ctx.lineTo(proj.hipR[0], proj.hipR[1]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  _drawArcReactorFinale(ctx, cx, cy, w, h, t) {
+    const pulse = 0.8 + (Math.sin(t * 8.2) * 0.2);
+    const r = Math.min(w, h) * 0.23;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // Outer metallic ring
+    ctx.fillStyle = 'rgba(20,26,32,1)';
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.28, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 3 structural brackets (static mechanics)
+    ctx.fillStyle = 'rgba(52,64,78,0.95)';
+    for (let i = 0; i < 3; i += 1) {
+      const a = (-Math.PI / 2) + (i * ((Math.PI * 2) / 3));
+      const bx = Math.cos(a) * r * 1.45;
+      const by = Math.sin(a) * r * 1.45;
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.rotate(a + Math.PI / 2);
+      ctx.fillRect(-18, -34, 36, 68);
+      ctx.restore();
+    }
+
+    // Backlighting through mechanical gaps
+    for (let i = 0; i < 12; i += 1) {
+      const a = (i / 12) * Math.PI * 2;
+      const gx = Math.cos(a) * r * 1.18;
+      const gy = Math.sin(a) * r * 1.18;
+      ctx.fillStyle = `rgba(0,229,255,${0.08 + (pulse * 0.14)})`;
+      ctx.beginPath();
+      ctx.arc(gx, gy, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Outer equilateral downward triangle frame
+    const tri = r * 0.82;
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = 'rgba(0,229,255,0.92)';
+    ctx.shadowColor = 'rgba(0,136,170,0.95)';
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.moveTo(0, tri * 0.95);
+    ctx.lineTo(-tri * 0.87, -tri * 0.5);
+    ctx.lineTo(tri * 0.87, -tri * 0.5);
+    ctx.closePath();
+    ctx.stroke();
+
+    // Cyan fill between frame and inner core
+    const inner = tri * 0.52;
+    const triGlow = ctx.createRadialGradient(0, 0, 10, 0, 0, tri);
+    triGlow.addColorStop(0, `rgba(0,229,255,${0.6 * pulse})`);
+    triGlow.addColorStop(1, 'rgba(0,229,255,0)');
+    ctx.fillStyle = triGlow;
+    ctx.beginPath();
+    ctx.moveTo(0, tri * 0.8);
+    ctx.lineTo(-tri * 0.72, -tri * 0.42);
+    ctx.lineTo(tri * 0.72, -tri * 0.42);
+    ctx.closePath();
+    ctx.fill();
+
+    // Pure white inner triangle core pulse
+    ctx.fillStyle = `rgba(255,255,255,${0.8 + (0.2 * pulse)})`;
+    ctx.beginPath();
+    ctx.moveTo(0, inner * 0.82);
+    ctx.lineTo(-inner * 0.7, -inner * 0.4);
+    ctx.lineTo(inner * 0.7, -inner * 0.4);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  _drawHoloPanel(ctx, x, y, w, h, skew, title, subtitle, alpha = 0.3, warning = false) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.transform(1, 0, skew, 1, 0, 0);
+    ctx.fillStyle = `rgba(${warning ? '70,16,20' : '8,28,50'},${alpha})`;
+    ctx.strokeStyle = warning ? 'rgba(255,100,110,0.55)' : 'rgba(90,220,255,0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeRect(0, 0, w, h);
+    ctx.fillStyle = warning ? 'rgba(255,140,150,0.95)' : 'rgba(120,230,255,0.95)';
+    ctx.font = '600 11px Orbitron, sans-serif';
+    ctx.fillText(title, 10, 22);
+    ctx.fillStyle = 'rgba(170,220,240,0.8)';
+    ctx.font = '500 9px Orbitron, sans-serif';
+    ctx.fillText(subtitle, 10, 40);
+    ctx.restore();
+  }
+
+  _drawWireSuit(ctx, cx, cy, scale, landing) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    ctx.rotate((-0.08 + landing * 0.22));
+    ctx.strokeStyle = 'rgba(100,220,255,0.95)';
+    ctx.shadowColor = 'rgba(40,200,255,0.65)';
+    ctx.shadowBlur = 16;
+    ctx.lineWidth = 1.6;
+
+    const lines = [
+      [-18, -90, 18, -90], [0, -90, 0, -58],
+      [-26, -56, 26, -56], [-30, -56, -42, -6], [30, -56, 42, -6],
+      [-22, -56, -18, 0], [22, -56, 18, 0],
+      [-18, 0, 18, 0], [-18, 0, -14, 58], [18, 0, 14, 58],
+      [-14, 58, -26, 108], [14, 58, 26, 108],
+    ];
+    lines.forEach(([x1, y1, x2, y2]) => {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    });
+
+    ctx.beginPath();
+    ctx.arc(0, -104, 14, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  _drawParticleStorm(ctx, cx, cy, swirl, opacity) {
+    const list = this._bootParticles;
+    if (!list.length) return;
+    for (let i = 0; i < list.length; i += 1) {
+      const p = list[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0 || p.x > 1) p.vx *= -1;
+      if (p.y < 0 || p.y > 1) p.vy *= -1;
+
+      const ang = (i * 0.12) + (swirl * Math.PI * 8);
+      const radius = 30 + (i % 170) * 1.8;
+      const sx = cx + Math.cos(ang + p.x * 8) * radius * (0.3 + swirl) + (p.x - 0.5) * 90;
+      const sy = cy + Math.sin(ang + p.y * 8) * radius * (0.2 + swirl) + (p.y - 0.5) * 60;
+
+      const a = p.a * opacity;
+      if (p.c === 'red') ctx.fillStyle = `rgba(255,110,122,${0.35 * a})`;
+      else if (p.c === 'white') ctx.fillStyle = `rgba(220,240,255,${0.45 * a})`;
+      else ctx.fillStyle = `rgba(76,210,255,${0.55 * a})`;
+
+      const size = p.s * (0.8 + swirl * 0.7);
+      ctx.fillRect(sx, sy, size, size);
+    }
+  }
+
+  _drawConstructionRings(ctx, cx, cy, p) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    for (let i = 0; i < 4; i += 1) {
+      const r = 70 + i * 30;
+      ctx.strokeStyle = `rgba(70,210,255,${0.35 + i * 0.1})`;
+      ctx.lineWidth = 7 - i;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, (p * Math.PI * (2 + i * 0.4)), (p * Math.PI * (4 + i * 0.5)));
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(110,230,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-150, -160 + p * 140);
+    ctx.lineTo(-150, 170);
+    ctx.moveTo(150, -160 + p * 140);
+    ctx.lineTo(150, 170);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  _drawArcReactor(ctx, cx, cy, p, t) {
+    const zoom = 1 + p * 0.26;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(zoom, zoom);
+
+    // shells
+    for (let i = 0; i < 5; i += 1) {
+      const r = 46 + i * 24;
+      ctx.strokeStyle = `rgba(${30 + i * 10},${55 + i * 10},${85 + i * 10},0.95)`;
+      ctx.lineWidth = 10 - i;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // spinning light rings
+    for (let i = 0; i < 3; i += 1) {
+      const r = 78 + i * 26;
+      const spin = t * (1.8 + i * 0.6) * (i % 2 ? -1 : 1);
+      ctx.strokeStyle = `rgba(70,220,255,${0.45 + i * 0.14})`;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, spin, spin + Math.PI * 1.2);
+      ctx.stroke();
+    }
+
+    // triangular core
+    ctx.beginPath();
+    const tri = 34;
+    ctx.moveTo(0, -tri);
+    ctx.lineTo(-tri * 0.88, tri * 0.65);
+    ctx.lineTo(tri * 0.88, tri * 0.65);
+    ctx.closePath();
+    const g = ctx.createRadialGradient(0, 0, 4, 0, 0, 70);
+    g.addColorStop(0, 'rgba(180,240,255,0.95)');
+    g.addColorStop(1, 'rgba(0,180,235,0.45)');
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // reactor glow
+    const pulse = 0.7 + (Math.sin(t * 8) * 0.3);
+    ctx.shadowColor = 'rgba(0,212,255,0.95)';
+    ctx.shadowBlur = 40 + pulse * 24;
+    ctx.strokeStyle = `rgba(120,238,255,${0.65 + pulse * 0.3})`;
+    ctx.lineWidth = 3.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, 52, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Set progress bar width */
+  _setProgress(el, pct) {
+    if (el) el.style.width = `${pct}%`;
+  }
+
+  /** Screen shake effect — feels mechanical */
+  _shakeOverlay(el, intensity = 2) {
+    if (!el) return;
+    const px = intensity;
+    el.animate([
+      { transform: 'translate(0, 0)' },
+      { transform: `translate(${px}px, -${px}px)` },
+      { transform: `translate(-${px}px, ${px}px)` },
+      { transform: `translate(${px}px, ${px * 0.5}px)` },
+      { transform: 'translate(0, 0)' },
+    ], { duration: 150, easing: 'ease-out' });
   }
 
   /** Flash the boot reactor for dramatic effect */
   _flashBootReactor() {
-    const reactor = this.dom.bootOverlay?.querySelector('.boot-reactor');
+    const reactor = this.dom.bootReactorCore;
     if (!reactor) return;
     reactor.classList.add('reactor-flash');
     setTimeout(() => reactor.classList.remove('reactor-flash'), 600);
+  }
+
+  _speakBootLine(text) {
+    try {
+      if (!('speechSynthesis' in window)) return;
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'en-GB';
+      utter.rate = 0.96;
+      utter.pitch = 0.88;
+      const voices = window.speechSynthesis.getVoices?.() || [];
+      const british = voices.find((v) => /en-GB/i.test(v.lang)) || voices[0];
+      if (british) utter.voice = british;
+      window.speechSynthesis.speak(utter);
+    } catch {
+      // non-blocking if voice isn't available
+    }
   }
 
   _setBootPhase(phase) {

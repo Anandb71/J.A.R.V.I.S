@@ -24,6 +24,25 @@ backend/memory/
 implementation_plan.md
 plans/
 
+# Local archives, screenshots, and temporary artifacts
+*.rar
+*.zip
+build_output.txt
+build_error.txt
+backend_stress_report*.json
+AS_OF_NOW_DETAILED_REPORT_*.md
+FULL_PROJECT_REPORT_*.md
+TEAM_HANDOVER_*.md
+AUTOMATION_MODE.md
+
+# Experimental stress folders
+src/ai_generated/
+src/ai_stress*/
+
+# Proprietary/local-only 3D assets
+src/assets/models/IronMan/*.obj
+src/assets/models/IronMan/*.mtl
+
 # Environment
 .env
 

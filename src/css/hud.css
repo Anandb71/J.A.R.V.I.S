@@ -2366,3 +2366,377 @@ body.startup-sequence[data-startup-phase="phase-9"] .bottom-bar {
   animation: mech-clank 180ms steps(3, end) 1;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   BOOT SEQUENCE V26 — CINEMATIC 4-PHASE STARTUP
+   ══════════════════════════════════════════════════════════════ */
+.boot-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, rgba(2, 16, 34, 0.96), rgba(1, 7, 16, 0.99));
+}
+
+.boot-cosmos {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 14% 20%, rgba(0, 212, 255, 0.12), transparent 36%),
+    radial-gradient(circle at 88% 16%, rgba(0, 212, 255, 0.08), transparent 38%),
+    linear-gradient(transparent 98%, rgba(0, 212, 255, 0.04) 100%);
+  filter: saturate(1.1);
+}
+
+.boot-main-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  perspective: 1200px;
+}
+
+.boot-platform {
+  position: absolute;
+  width: 440px;
+  height: 440px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 212, 255, 0.22);
+  box-shadow: 0 0 70px rgba(0, 212, 255, 0.16), inset 0 0 40px rgba(0, 212, 255, 0.1);
+  transform: rotateX(66deg);
+  opacity: 0.72;
+}
+
+.boot-holo-panels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.boot-holo-panel {
+  position: absolute;
+  width: 240px;
+  padding: 12px;
+  border: 1px solid rgba(0, 212, 255, 0.28);
+  background: rgba(4, 24, 44, 0.45);
+  backdrop-filter: blur(8px);
+  color: rgba(177, 226, 255, 0.9);
+  transform: perspective(700px) rotateY(-16deg);
+  box-shadow: 0 0 24px rgba(0, 212, 255, 0.16);
+  animation: boot-panel-drift 5s ease-in-out infinite;
+}
+
+.boot-holo-panel h5 {
+  margin: 0 0 4px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--arc-core);
+}
+
+.boot-holo-panel span {
+  font-size: 9px;
+  opacity: 0.82;
+}
+
+.boot-holo-panel.p1 { left: 6%; top: 12%; }
+.boot-holo-panel.p2 { right: 7%; top: 14%; transform: perspective(700px) rotateY(16deg); }
+.boot-holo-panel.p3 { left: 10%; bottom: 17%; }
+.boot-holo-panel.warning h5 { color: #ff7b86; }
+
+.boot-wireframe {
+  position: absolute;
+  width: 160px;
+  height: 260px;
+  transform-style: preserve-3d;
+  transform: translateY(-36px) scale(0.82) rotateX(8deg);
+  transition: all 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  filter: drop-shadow(0 0 16px rgba(0, 212, 255, 0.45));
+}
+
+.boot-wireframe > div {
+  position: absolute;
+  border: 1px solid rgba(0, 212, 255, 0.8);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.35);
+  background: rgba(0, 212, 255, 0.05);
+}
+
+.wf-head { width: 32px; height: 32px; left: 64px; top: 0; }
+.wf-torso { width: 74px; height: 92px; left: 43px; top: 36px; }
+.wf-arm.left { width: 18px; height: 90px; left: 20px; top: 44px; transform: rotate(18deg); }
+.wf-arm.right { width: 18px; height: 90px; right: 20px; top: 44px; transform: rotate(-18deg); }
+.wf-leg.left { width: 24px; height: 106px; left: 54px; top: 134px; transform: rotate(6deg); }
+.wf-leg.right { width: 24px; height: 106px; right: 54px; top: 134px; transform: rotate(-12deg); }
+
+.boot-wireframe.landing {
+  transform: translateY(12px) scale(1.04) rotateX(22deg) rotateZ(-6deg);
+}
+
+.boot-wireframe.dissolve {
+  opacity: 0;
+  transform: translateY(18px) scale(0.7) rotateX(30deg);
+  transition-duration: 420ms;
+}
+
+.boot-particles {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot-particles i {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: calc(2px * var(--s));
+  height: calc(2px * var(--s));
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(180, 232, 255, 0.95), rgba(0, 212, 255, 0.25));
+  animation: boot-particle-swirl var(--d) ease-in-out infinite alternate;
+}
+
+.boot-particles.active { opacity: 1; }
+
+.boot-build-rig {
+  position: absolute;
+  width: 380px;
+  height: 380px;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: all 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.boot-build-rig.active { opacity: 1; transform: scale(1); }
+
+.boot-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 5px solid rgba(0, 212, 255, 0.6);
+  box-shadow: 0 0 30px rgba(0, 212, 255, 0.35);
+  animation: reactor-spin 2.2s linear infinite;
+}
+
+.boot-ring.r1 { width: 300px; height: 300px; }
+.boot-ring.r2 { width: 250px; height: 250px; animation-duration: 1.9s; animation-direction: reverse; }
+.boot-ring.r3 { width: 206px; height: 206px; animation-duration: 1.5s; }
+.boot-ring.r4 { width: 164px; height: 164px; animation-duration: 1.2s; animation-direction: reverse; }
+
+.boot-build-rig.locked .boot-ring {
+  animation-duration: 0.9s;
+  border-color: rgba(0, 212, 255, 0.86);
+}
+
+.boot-scan-beam {
+  position: absolute;
+  left: 50%;
+  width: 2px;
+  height: 300px;
+  top: 40px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(0, 212, 255, 0.8), transparent);
+  opacity: 0;
+}
+
+.boot-build-rig.active .boot-scan-beam { opacity: 0.6; animation: boot-beam-scan 850ms linear infinite; }
+.boot-build-rig.active .boot-scan-beam.b2 { animation-delay: -0.4s; }
+
+.boot-reactor-core {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  opacity: 0;
+  transform: scale(0.8) rotateX(42deg);
+  transition: all 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.boot-reactor-core.active { opacity: 1; transform: scale(1) rotateX(72deg); }
+
+.reactor-shell {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 14px solid rgba(16, 34, 60, 0.95);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 0, 0, 0.4);
+}
+
+.reactor-shell.inner {
+  inset: 42px;
+  border-width: 8px;
+  border-color: rgba(30, 56, 88, 0.95);
+}
+
+.reactor-mesh {
+  position: absolute;
+  inset: 78px;
+  border-radius: 50%;
+  border: 2px dashed rgba(126, 217, 255, 0.45);
+  animation: reactor-spin 2.4s linear infinite;
+}
+
+.reactor-triangle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 92px;
+  height: 82px;
+  transform: translate(-50%, -50%);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  background: radial-gradient(circle at 50% 40%, rgba(146, 225, 255, 0.9), rgba(0, 212, 255, 0.45));
+}
+
+.reactor-glow {
+  position: absolute;
+  inset: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(120, 221, 255, 0.95), rgba(0, 212, 255, 0.26));
+  box-shadow: 0 0 50px rgba(0, 212, 255, 0.7);
+  opacity: 0.7;
+  animation: breathe 1.8s ease-in-out infinite;
+}
+
+.boot-reactor-core.ignited .reactor-glow {
+  opacity: 1;
+  box-shadow: 0 0 80px rgba(0, 212, 255, 0.95), 0 0 140px rgba(0, 212, 255, 0.45);
+}
+
+.boot-side-panel {
+  position: absolute;
+  left: 3.5%;
+  top: 20%;
+  width: 220px;
+  padding: 10px;
+  border: 1px solid rgba(0, 212, 255, 0.25);
+  background: rgba(8, 24, 44, 0.44);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transform: translateX(-18px);
+  transition: all 360ms ease;
+}
+
+.boot-side-panel.visible { opacity: 1; transform: translateX(0); }
+.boot-side-panel .panel-title { font-size: 9px; letter-spacing: 0.14em; color: rgba(150, 212, 255, 0.88); margin-bottom: 6px; }
+.boot-counter { font-size: 36px; color: var(--arc-core); text-shadow: 0 0 14px rgba(0, 212, 255, 0.42); }
+
+.boot-targeting {
+  margin-top: 8px;
+  display: flex;
+  gap: 10px;
+}
+
+.boot-targeting span {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(0, 212, 255, 0.35);
+  border-radius: 50%;
+  box-shadow: inset 0 0 10px rgba(0, 212, 255, 0.2);
+}
+
+.boot-loading-box {
+  position: absolute;
+  right: 6%;
+  bottom: 22%;
+  border: 1px solid rgba(255, 80, 90, 0.65);
+  color: #ff9da3;
+  background: rgba(40, 8, 12, 0.45);
+  padding: 10px 14px;
+  letter-spacing: 0.14em;
+  font-size: 10px;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 300ms ease;
+}
+
+.boot-loading-box.visible { opacity: 1; transform: translateY(0); }
+
+.boot-overlay[data-phase="phase-2"] .boot-loading-box,
+.boot-overlay[data-phase="phase-3"] .boot-loading-box,
+.boot-overlay[data-phase="phase-4"] .boot-loading-box,
+.boot-overlay[data-phase="complete"] .boot-loading-box {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.boot-overlay[data-phase="phase-4"],
+.boot-overlay.reactor-zoom {
+  animation: boot-reactor-zoom 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.boot-overlay.reactor-zoom .boot-holo-panels,
+.boot-overlay.reactor-zoom .boot-side-panel {
+  filter: blur(3px);
+  opacity: 0.35;
+}
+
+@keyframes boot-panel-drift {
+  0%, 100% { transform: perspective(700px) rotateY(-16deg) translateY(0); }
+  50% { transform: perspective(700px) rotateY(-12deg) translateY(-6px); }
+}
+
+@keyframes boot-particle-swirl {
+  0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0.3; }
+  100% { transform: translate(26px, -28px) scale(1.3); opacity: 0.95; }
+}
+
+@keyframes boot-beam-scan {
+  0% { transform: translateX(-50%) translateY(-12px); opacity: 0; }
+  20% { opacity: 0.6; }
+  100% { transform: translateX(-50%) translateY(120px); opacity: 0; }
+}
+
+@keyframes boot-reactor-zoom {
+  0% { transform: scale(1) rotateX(0deg); }
+  100% { transform: scale(1.08) rotateX(2deg); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BOOT SEQUENCE V28 — SPEC-ACCURATE CANVAS OVERRIDES
+   ══════════════════════════════════════════════════════════════ */
+.boot-overlay {
+  background: #000000 !important;
+}
+
+.boot-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: auto;
+}
+
+/* Legacy DOM boot widgets disabled for pure canvas sequence */
+.boot-side-panel,
+.boot-loading-box,
+.boot-hud-display,
+.boot-progress-track,
+.boot-progress-fill,
+.boot-reactor,
+.boot-mech-gate,
+.boot-lockbar,
+.boot-brace,
+.boot-cosmos,
+.boot-main-stage,
+.boot-platform,
+.boot-holo-panels,
+.boot-wireframe,
+.boot-particles,
+.boot-build-rig,
+.boot-reactor-core {
+  display: none !important;
+}
+
+.boot-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+

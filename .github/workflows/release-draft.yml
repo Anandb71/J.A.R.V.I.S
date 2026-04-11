@@ -1,0 +1,23 @@
+name: Release Draft Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-check:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build unpacked app
+        run: npm run build:dir

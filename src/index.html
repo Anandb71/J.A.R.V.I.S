@@ -12,48 +12,10 @@
     <link rel="stylesheet" href="./css/hud.css" />
   </head>
   <body>
-    <!-- ═══ Boot Overlay — Iron Man Suit-Up Sequence ═══ -->
-    <div id="boot-overlay" class="boot-overlay" role="status" aria-live="polite">
-      <!-- Mechanical blast doors -->
-      <div class="boot-mech-gate gate-left" aria-hidden="true">
-        <div class="gate-hydraulic"></div>
-        <div class="gate-rivets"><span></span><span></span><span></span><span></span><span></span></div>
-      </div>
-      <div class="boot-mech-gate gate-right" aria-hidden="true">
-        <div class="gate-hydraulic"></div>
-        <div class="gate-rivets"><span></span><span></span><span></span><span></span><span></span></div>
-      </div>
-
-      <!-- Armor lockbars -->
-      <div class="boot-lockbar lock-top" aria-hidden="true"></div>
-      <div class="boot-lockbar lock-bottom" aria-hidden="true"></div>
-
-      <!-- Hex grid overlay -->
-      <div class="boot-hex-grid" aria-hidden="true"></div>
-
-      <!-- Triple-ring reactor core -->
-      <div class="boot-reactor">
-        <div class="boot-reactor-ring ring-outer"></div>
-        <div class="boot-reactor-ring ring-mid"></div>
-        <div class="boot-reactor-ring ring-inner"></div>
-        <div class="boot-reactor-inner"></div>
-      </div>
-
-      <!-- Cross braces -->
-      <div class="boot-brace brace-a" aria-hidden="true"></div>
-      <div class="boot-brace brace-b" aria-hidden="true"></div>
-
-      <!-- Boot status display -->
-      <div class="boot-hud-display">
-        <div class="boot-header">STARK INDUSTRIES</div>
-        <div class="boot-title">J.A.R.V.I.S.</div>
-        <div class="boot-subtitle">Just A Rather Very Intelligent System</div>
-        <div class="boot-progress-track" aria-hidden="true">
-          <div id="boot-progress-fill" class="boot-progress-fill"></div>
-        </div>
-        <div id="boot-log" class="boot-log">Starting core services…</div>
-        <div class="boot-version">v21.0 // COMMAND CORE INTERFACE</div>
-      </div>
+    <!-- ═══ Boot Overlay — Cinematic Startup v27 (Canvas Engine) ═══ -->
+    <div id="boot-overlay" class="boot-overlay" role="status" aria-live="polite" data-phase="phase-1">
+      <canvas id="boot-canvas" class="boot-canvas" width="1920" height="1080" aria-hidden="true"></canvas>
+      <div class="boot-visually-hidden" id="boot-log">INITIATING SYSTEM 1....</div>
     </div>
 
     <!-- ═══ Main HUD ═══ -->

@@ -360,6 +360,24 @@ function setupIpc() {
     if (!credentialStore || !key) return false;
     return credentialStore.delete(String(key));
   });
+
+  ipcMain.handle('jarvis:read-asset-text', (event, relativePath) => {
+    if (!isTrustedSender(event)) return null;
+
+    const rel = String(relativePath || '').replace(/\\/g, '/').trim();
+    if (!rel || rel.includes('..')) return null;
+
+    try {
+      const srcRoot = path.resolve(app.getAppPath(), 'src');
+      const target = path.resolve(srcRoot, rel);
+      const safePrefix = `${srcRoot}${path.sep}`;
+      if (!(target === srcRoot || target.startsWith(safePrefix))) return null;
+      if (!fs.existsSync(target)) return null;
+      return fs.readFileSync(target, 'utf8');
+    } catch {
+      return null;
+    }
+  });
 }
 
 app.whenReady().then(async () => {

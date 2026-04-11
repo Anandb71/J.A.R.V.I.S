@@ -1,4 +1,0 @@
-// C:\Users\anand\Repos\Jarvis\src\ai_stress\util_2.ts
-export function util_2(): string {
-  return 'ok-2';
-}

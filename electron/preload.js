@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('jarvis', {
   setCredential: (key, value) => ipcRenderer.invoke('jarvis:set-credential', key, value),
   getCredential: (key) => ipcRenderer.invoke('jarvis:get-credential', key),
   deleteCredential: (key) => ipcRenderer.invoke('jarvis:delete-credential', key),
+  readAssetText: (relativePath) => ipcRenderer.invoke('jarvis:read-asset-text', relativePath),
   onBackendStatus: (callback) => {
     const listener = (_event, payload) => callback(payload);
     ipcRenderer.on('jarvis:backend-status', listener);

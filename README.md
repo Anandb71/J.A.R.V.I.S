@@ -1,228 +1,142 @@
-# JARVIS
+# J.A.R.V.I.S.
 
-*A real-time desktop AI assistant for Windows, combining voice, screen awareness, system intelligence, and a holographic HUD.*
+> A Windows-first desktop AI assistant with a cinematic HUD, local-first brain, real-time voice, and operational safety controls.
 
----
+<p align="left">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-0078D6">
+  <img alt="Frontend" src="https://img.shields.io/badge/frontend-Electron%20%2B%20Canvas-00B7FF">
+  <img alt="Backend" src="https://img.shields.io/badge/backend-FastAPI-009688">
+  <img alt="Realtime" src="https://img.shields.io/badge/realtime-WebSocket-5E35B1">
+  <img alt="Status" src="https://img.shields.io/badge/status-active-success">
+</p>
 
-## What is JARVIS?
+## Why this project exists
 
-JARVIS is a Windows-first assistant designed to feel like a dependable co-pilot rather than a chatbot tab.
+Most desktop assistants are either pretty demos or useful tools. J.A.R.V.I.S. is engineered to be both:
 
-It combines:
-- an **Electron-based transparent HUD**,
-- a **Python + FastAPI backend** for AI/automation pipelines,
-- **voice interaction** (wake word, STT, TTS),
-- **screen-aware assistance** (privacy-controlled vision),
-- **system telemetry and automation tools**,
-- and **adaptive performance tiers** so it remains responsive across hardware classes.
+- **Reliable day-to-day assistant** for chat, voice, telemetry, and automation
+- **Modular architecture** with clear boundaries across UI, backend, and providers
+- **Performance-aware visual system** that degrades gracefully under load
+- **Security-first IPC and tool execution policy** for safer desktop operations
 
-In short: cinematic when your machine can afford it, practical when it can’t. (No drama, only useful sci-fi.)
+Or, in Tony terms: *high style, low nonsense.*
 
----
+## Feature highlights
 
-## Project Goals
+- Transparent, always-on-top Electron HUD with click-through support
+- FastAPI backend with REST + WebSocket channels
+- Local-first AI routing with optional cloud fallback
+- Voice pipeline (wake/transcript/reply events)
+- Vision and gesture modules (feature-gated)
+- System telemetry with live diagnostics and stress adaptation
+- Cinematic startup sequence with custom JARVIS phases
 
-- Deliver a reliable, low-latency desktop assistant for daily workflows.
-- Keep architecture modular so providers and subsystems can be swapped without rewrites.
-- Prioritize **safety, observability, and graceful degradation** over flashy but fragile behavior.
-- Maintain strong privacy controls for screen-aware features.
+## Screenshots
 
----
+> Add your captures under `docs/screenshots/` and keep file names stable for public docs.
 
-## AI Modes (Local-First + Optional Cloud)
+- `docs/screenshots/startup_hud.png`
+- `docs/screenshots/main_dashboard.png`
 
-JARVIS supports two official brain modes:
+## Credits and acknowledgements
 
-### 1) Local Mode (default)
-- Privacy-first and API-key free
-- Designed for small, optimized models that still work well for day-to-day commands
-- Recommended baseline models (quantized):
-  - `qwen2.5:3b-instruct` (Q4)
-  - `llama3.2:3b-instruct` (Q4)
-- Best when you want safer data locality and predictable costs
+For complete attributions and third-party notices, see:
 
-### 2) API Mode (optional)
-- User provides API key(s)
-- Better for complex reasoning and heavier coding/planning tasks
-- Useful when you want higher capability beyond small local models
+- `CREDITS_AND_ACKNOWLEDGEMENTS.md`
+- `THIRD_PARTY_NOTICES.md`
 
-### Recommended open-source default
-- **Ship with Local Mode enabled by default**
-- Keep **API Mode opt-in**
-- Offer a simple router: local for routine requests, cloud for difficult ones (if enabled)
+### 3D model credit (startup suit)
 
----
+The Iron Man startup model reference used during development is credited to:
 
-## Architecture at a Glance
+- **Personal Use License**
+- **940,556 visits**
+- **383,780 downloads**
+- **Submitted by:** `deadcode3`
 
-### Frontend
-- **Electron** overlay (transparent, always-on-top, click-through aware)
-- **Three.js** visual core for HUD effects
-- **D3.js / Canvas** for real-time system gauges
+Important: this model is **not** covered by this repository's MIT license. You must comply with the original creator's terms.
 
-### Backend
-- **FastAPI** app with WebSocket + REST control surface
-- AI brain with local-first provider abstraction (+ optional cloud adapters)
-- Voice stack (wake word, STT, TTS)
-- Vision stack (screen capture + analyzer + privacy layer)
-- Gesture and system modules
+### Marvel / trademark disclaimer
 
-### Communication
-- **WebSocket** for real-time streams (state, metrics, events)
-- **REST** for config and command endpoints
+J.A.R.V.I.S., Iron Man, and related names/designs are trademarks and/or copyrighted properties of their respective owners (including Marvel). This project is an independent fan/engineering project and is **not affiliated with, endorsed by, or sponsored by Marvel or Disney**.
 
----
+## Architecture overview
 
-## Implementation Strategy
+### Frontend (`src/`, `electron/`)
 
-The delivery strategy is risk-adjusted and performance-first:
+- Electron shell (`electron/main.js`, `electron/preload.js`)
+- HUD rendering in HTML/CSS/JS with Canvas and worker-assisted effects
+- IPC bridge with sender validation and constrained API exposure
 
-1. Foundation and process lifecycle
-2. Voice MVP
-3. AI + safe tools
-4. Vision + privacy controls
-5. HUD polish + optimization pass
-6. Beta hardening with soak tests and diagnostics
+### Backend (`backend/`)
 
-This repo treats performance as an engineering contract, not a wish:
-- tiered quality profiles,
-- strict P95 goals,
-- automatic degradation ladder,
-- profiling/telemetry release gates.
+- FastAPI service and websocket hub
+- Core brain/router/memory/tool execution modules
+- Voice, vision, gestures, system monitoring, and security audit components
 
----
+## Runtime services
 
-## Performance Philosophy
+- App shell: Electron
+- Backend API: `http://127.0.0.1:8765`
+- WebSocket: `ws://127.0.0.1:8765/ws`
+- Optional local model runtime: Ollama (`127.0.0.1:11434`)
 
-JARVIS is designed around this principle:
+## Getting started (Windows)
 
-> “No lag” means **adaptive responsiveness across real hardware**, not forcing full effects on every machine.
+### Prerequisites
 
-Key practices:
-- Render-on-demand where continuous rendering is unnecessary
-- Main-thread protection (batch reads/writes, avoid layout thrashing)
-- Explicit GPU resource disposal for dynamic Three.js assets
-- Worker/process offloading for heavy non-UI tasks
-- Runtime down-tiering under sustained pressure
+- Node.js 18+
+- Python 3.10+
+- PowerShell
+- (Optional) Ollama for local model inference
 
----
+### Setup
 
-## Repository Plan Documents
+From repository root:
 
-This implementation is driven by the following planning artifacts in `plans/`:
+1. `scripts/setup.ps1`
+2. `scripts/dev.ps1`
 
-- `research_synthesis.md`
-- `mvp_delivery_plan_12_weeks.md`
-- `risk_register.md`
-- `cost_latency_budget.md`
-- `testing_observability_plan.md`
-- `performance_engineering_playbook.md`
-- `hardware_tier_matrix.md`
+### Development run
 
-Master plan:
-- `implementation_plan.md`
-
----
-
-## Status
-
-Current phase: **Phase 11 post-audit fixes landed**.
-
-Implemented in repo now:
-- Electron shell with IPC sender validation + permission/CSP security hardening
-- FastAPI backend with local-first AI routing, tool safety policy, memory, and streaming chat
-- Full-duplex voice path (VAD + STT + streaming TTS)
-- Vision inspection/capture with privacy filtering and sensitive-window redaction
-- Structured tool audit logging with risk-tier execution policy
-- Gesture pipeline with MediaPipe LIVE_STREAM tracker integration (feature-gated)
-- Runtime observability helpers: latency stats, crash hooks, and loop watchdog
-
-Next milestone focus:
-- tune gesture confidence/UX behavior with real-device testing,
-- validate packaging pipeline (`PyInstaller` + `electron-builder`) end-to-end,
-- expand automated tests and soak-run observability checks.
-
----
-
-## Quick Start (Windows)
-
-From the repository root:
-
-1. Run setup script:
-  - `scripts/setup.ps1`
-2. Launch dev app:
-  - `scripts/dev.ps1`
-
-What this starts now:
-- Electron HUD shell
-- Python FastAPI backend on `127.0.0.1:8765`
-- WebSocket heartbeat stream to HUD
-- Local-first AI chat endpoint: `POST /api/chat`
-- Safety policy check endpoint: `GET /api/tool-policy-check/{tool_name}`
-
-Local AI requirement for default mode:
-- Install and run Ollama
-- Pull at least one small model (default configured: `qwen2.5:3b-instruct`)
-
-If Python dependencies are already installed and you prefer direct launch:
 - `npm run dev`
 
----
+### Test commands
 
-## Credits & Acknowledgments
+- Frontend smoke tests: `npm test`
+- Backend tests: `.\.venv\Scripts\python -m pytest backend/tests -q`
 
-This project plan is built on the work of many maintainers, researchers, and open-source communities. Full credit to the people and teams behind the resources we reviewed and are implementing from.
+## Repository layout
 
-### Internal planning credits
-- JARVIS planning set in this repository:
-  - `implementation_plan.md`
-  - all documents under `plans/`
+- `electron/` — main process, preload bridge, service orchestration
+- `src/` — renderer UI, startup animation, workers, assets
+- `backend/` — FastAPI app and AI/service modules
+- `.github/workflows/` — CI automation
+- `docs/` — public documentation artifacts
 
-### Platform and architecture references
-- **Electron** documentation and security/performance guidance
-- **FastAPI** documentation (WebSockets, lifespan patterns, testing)
+## Security and privacy
 
-### Rendering and frontend performance references
-- **Three.js** manuals and ecosystem guidance
-  - rendering on demand
-  - OffscreenCanvas + worker patterns
-  - cleanup/disposal practices
-- **Chrome for Developers / web.dev** performance engineering resources
-  - layout thrashing avoidance
-  - compositor-friendly animation guidance
-  - Long Animation Frames (LoAF) API
-- **MDN Web Docs** for Web Workers, OffscreenCanvas, structured clone, and message passing behavior
+- IPC handlers validate trusted sender frame before action
+- CSP is enforced from Electron session headers
+- Tool execution policy supports allow/confirm/deny modes
+- Vision pipeline includes privacy-aware capture controls
 
-### Voice, AI, and multimodal references
-- **faster-whisper** and **CTranslate2** ecosystem
-- **Picovoice Porcupine** and **openWakeWord**
-- **MediaPipe** (hand landmarking/tracking modes)
-- **Ollama** and **llama.cpp** local inference ecosystems
-- **Gemini / Google AI** model lifecycle and API docs
-- **OpenAI** platform docs (provider abstraction planning)
+See `SECURITY.md` for reporting and hardening guidance.
 
-### Windows capture and automation references
-- **BetterCam** (Desktop Duplication capture path)
-- **pywinauto** and related Windows automation ecosystem docs
+## Contributing
 
-### Open-source assistant inspiration
-- **Linguflex**
-- **Mycroft**
+Pull requests are welcome. Please read:
 
-If your work appears in this stack and should be explicitly listed or linked differently, please open an issue/PR—we’ll gladly update credits.
-
----
+- `CONTRIBUTING.md`
+- `CODE_OF_CONDUCT.md`
+- `SECURITY.md`
 
 ## License
 
-License is currently TBD for this repository.
+This project is released under the MIT License. See `LICENSE`.
 
-Until a license file is added, treat this project as all-rights-reserved by default.
+Third-party assets, names, and trademarks are subject to their own terms. See `THIRD_PARTY_NOTICES.md`.
 
 ---
 
-## Final Note
-
-JARVIS aims to be the rare combo of ambitious and stable.
-
-If we ever have to choose between “looks amazing” and “works every day,” we choose “works every day” first—and then make it look amazing anyway.
+Built for builders who like their tooling fast, stable, and just a little bit dramatic.
