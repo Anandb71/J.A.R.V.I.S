@@ -1,6 +1,6 @@
 {
   "name": "jarvis-desktop-assistant",
-  "version": "25.0.0",
+  "version": "0.1.0",
   "description": "Project JARVIS - Electron + FastAPI desktop AI assistant",
   "main": "electron/main.js",
   "private": true,

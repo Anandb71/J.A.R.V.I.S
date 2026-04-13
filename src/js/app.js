@@ -100,7 +100,7 @@ class JarvisApp {
     this._completeBoot();
     this._bindUI();
     this._startWeatherLoop();
-    this.chat.addSystem('J.A.R.V.I.S. v25.0 is online. All systems nominal. At your service, sir.');
+    this.chat.addSystem('J.A.R.V.I.S. v0.1.0 is online. All systems nominal. At your service, sir.');
   }
 
   /** Cache DOM references */
