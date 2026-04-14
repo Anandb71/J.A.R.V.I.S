@@ -3,12 +3,15 @@
 > A Windows-first desktop AI assistant with a cinematic HUD, local-first brain, real-time voice, and operational safety controls.
 
 <p align="left">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.1.0-blueviolet">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-0078D6">
   <img alt="Frontend" src="https://img.shields.io/badge/frontend-Electron%20%2B%20Canvas-00B7FF">
   <img alt="Backend" src="https://img.shields.io/badge/backend-FastAPI-009688">
   <img alt="Realtime" src="https://img.shields.io/badge/realtime-WebSocket-5E35B1">
   <img alt="Status" src="https://img.shields.io/badge/status-active-success">
 </p>
+
+Current release: **v0.1.0**
 
 ## Why this project exists
 

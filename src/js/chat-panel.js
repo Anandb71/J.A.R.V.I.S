@@ -1,5 +1,5 @@
 /**
- * ChatPanel — JARVIS Comms Display
+ * ChatPanel — J.A.R.V.I.S. Comms Display
  *
  * Features:
  *  - Role-based message styling (user/assistant/tool/error/system)
@@ -63,7 +63,7 @@ export class ChatPanel {
 
     const meta = document.createElement('div');
     meta.className = 'chat-meta';
-    meta.textContent = `JARVIS · ${new Date().toLocaleTimeString()}`;
+    meta.textContent = `J.A.R.V.I.S. · ${new Date().toLocaleTimeString()}`;
 
     const body = document.createElement('div');
     body.className = 'chat-body';
@@ -136,7 +136,7 @@ export class ChatPanel {
 
     const roleLabels = {
       user: 'YOU',
-      assistant: 'JARVIS',
+      assistant: 'J.A.R.V.I.S.',
       tool: '⚡ TOOL',
       error: '⚠ ERROR',
       system: '● SYSTEM',
