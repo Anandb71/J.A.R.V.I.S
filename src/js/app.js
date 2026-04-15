@@ -118,6 +118,7 @@ class JarvisApp {
       calendar: document.getElementById('calendar'),
       chatPanel: document.getElementById('chat-panel'),
       chatInput: document.getElementById('chat-input'),
+      chatQuickActions: document.getElementById('chat-quick-actions'),
       btnSend: document.getElementById('btn-send'),
       btnMic: document.getElementById('btn-mic'),
       btnToggleVoiceReply: document.getElementById('btn-toggle-voice-reply'),
@@ -1366,6 +1367,14 @@ class JarvisApp {
       if (!input) return;
       const text = input.value.trim();
       if (!text || this._chatLocked) return;
+
+      if (text === '/clear') {
+        this.chat.clear();
+        this.chat.addSystem('Conversation cleared. Ready for a fresh command.');
+        input.value = '';
+        return;
+      }
+
       this._sendChat(text);
       input.value = '';
     };
@@ -1376,6 +1385,17 @@ class JarvisApp {
         e.preventDefault();
         sendMessage();
       }
+    });
+
+    this.dom.chatQuickActions?.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      const prompt = target.dataset.prompt;
+      if (!prompt || this._chatLocked) return;
+      if (this.dom.chatInput) {
+        this.dom.chatInput.value = prompt;
+      }
+      sendMessage();
     });
 
     // Mic button
@@ -1497,6 +1517,11 @@ class JarvisApp {
   _updateSendButton(disabled) {
     if (this.dom.btnSend) this.dom.btnSend.disabled = disabled;
     if (this.dom.chatInput) this.dom.chatInput.disabled = disabled;
+    if (this.dom.chatQuickActions) {
+      this.dom.chatQuickActions.querySelectorAll('button').forEach((btn) => {
+        btn.disabled = disabled;
+      });
+    }
   }
 
   _startChatUnlockFailsafe() {

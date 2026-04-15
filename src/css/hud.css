@@ -1968,6 +1968,25 @@ body[data-ai-era="edith"] .particle-flow { opacity: .35; }
   background: var(--surface-glass);
 }
 
+.chat-panel::-webkit-scrollbar {
+  width: 10px;
+}
+
+.chat-panel::-webkit-scrollbar-track {
+  background: rgba(0, 212, 255, 0.04);
+  border-radius: var(--r-pill);
+}
+
+.chat-panel::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(0, 212, 255, 0.35), rgba(168, 85, 247, 0.3));
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(0, 212, 255, 0.18);
+}
+
+.chat-panel::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(0, 212, 255, 0.5), rgba(168, 85, 247, 0.42));
+}
+
 .chat-item {
   border-radius: var(--r-md);
   padding: 10px 14px;
@@ -2109,6 +2128,65 @@ body[data-ai-era="edith"] .particle-flow { opacity: .35; }
 
 .send-btn svg {
   stroke: var(--arc-core);
+}
+
+.chat-quick-actions {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat-chip {
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.06), rgba(168, 85, 247, 0.05));
+  color: var(--text-dim);
+  border-radius: var(--r-pill);
+  padding: 5px 10px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: 'Orbitron', sans-serif;
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+
+.chat-chip:hover {
+  color: var(--arc-core);
+  border-color: rgba(0, 212, 255, 0.35);
+  box-shadow: 0 0 10px var(--arc-ghost);
+  transform: translateY(-1px);
+}
+
+.chat-chip:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.chat-helper-row {
+  margin-top: 8px;
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: 'Inter', sans-serif;
+}
+
+.chat-helper-kbd {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  background: rgba(0, 212, 255, 0.05);
+  border-radius: var(--r-xs);
+  padding: 1px 5px;
+}
+
+.chat-helper-dot {
+  opacity: 0.5;
 }
 
 /* ══════════════════════════════════════════════════════════════
