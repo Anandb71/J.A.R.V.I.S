@@ -50,7 +50,7 @@
     ]
   },
   "dependencies": {
-    "@ricky0123/vad-web": "^0.0.18",
+    "@ricky0123/vad-web": "^0.0.30",
     "electron-updater": "^6.0.0",
     "three": "^0.170.0"
   },
