@@ -52,7 +52,7 @@
   "dependencies": {
     "@ricky0123/vad-web": "^0.0.18",
     "electron-updater": "^6.0.0",
-    "three": "^0.170.0"
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "electron": "^33.0.0",
